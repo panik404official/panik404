@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 export const TABS = ['work', 'relationships', 'that text from Tuesday', 'money', 'am I overthinking?'];
+/* lavender shades keep the story panels within the site palette */
+const TABC = ['#eadfff', '#e3d9ff', '#dcd0ff', '#eee8ff', '#e3d9ff', '#d8c7ff'];
+const TABD = ['#bda4ff', '#a78bfa', '#9b7bea', '#c4b5fd', '#a995ee', '#8b6bd6'];
 const rr = (x, a, b, w, h, r) => {
   x.beginPath();
   x.moveTo(a + r, b);
@@ -9,7 +12,7 @@ const rr = (x, a, b, w, h, r) => {
   x.arcTo(a, b, a + w, b, r);
   x.closePath();
 };
-export function tabTex(label, mark = '×') {
+export function tabTex(label, i, mark = '×') {
   const c = document.createElement('canvas');
   c.width = 520;
   c.height = 320;
@@ -19,32 +22,35 @@ export function tabTex(label, mark = '×') {
   const draw = () => {
     x.clearRect(0, 0, 520, 320);
     rr(x, 6, 6, 508, 308, 26);
-    x.fillStyle = '#fff';
+    const bg = x.createLinearGradient(0, 0, 0, 320);
+    bg.addColorStop(0, '#ffffff');
+    bg.addColorStop(1, '#fbf9ff');
+    x.fillStyle = bg;
     x.fill();
-    x.lineWidth = 5;
-    x.strokeStyle = '#c4b5fd';
+    x.lineWidth = 4;
+    x.strokeStyle = TABD[i];
     x.stroke();
     x.save();
     rr(x, 6, 6, 508, 308, 26);
     x.clip();
-    x.fillStyle = '#ede9fe';
+    x.fillStyle = TABC[i];
     x.fillRect(6, 6, 508, 70);
     x.restore();
     [
-      ['#8b5cf6', 48],
-      ['#c4b5fd', 78],
-      ['#ddd6fe', 108],
+      ['#c4b5fd', 48],
+      ['#a78bfa', 78],
+      ['#d8c7ff', 108],
     ].forEach(([c, p]) => {
       x.fillStyle = c;
       x.beginPath();
       x.arc(p, 41, 10, 0, 7);
       x.fill();
     });
-    x.fillStyle = mark === '×' ? '#7c3aed' : '#34c38f';
+    x.fillStyle = TABD[i];
     x.font = '700 40px Nunito,sans-serif';
     x.textAlign = 'right';
     x.fillText(mark, 488, 56);
-    x.fillStyle = '#2e1065';
+    x.fillStyle = '#4a3f6b';
     x.font = '700 42px Nunito,sans-serif';
     x.textAlign = 'center';
     const ls = [];

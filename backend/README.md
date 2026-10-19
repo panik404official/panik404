@@ -1,0 +1,81 @@
+# Panik API (FastAPI + Tortoise ORM + Neon Postgres)
+
+Tracks every visitor from first page view to purchase: **visitor → session → events → customer → order → payment**.
+
+## Run it
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env                                   # fill NEON_DB_URL, ADMIN_API_KEY, IP_HASH_SECRET
+tortoise -c app.tortoise_conf.TORTOISE_ORM migrate     # creates tables, partitions, seeds products
+uvicorn app.main:app --reload                          # docs at /docs when ENVIRONMENT != production
+pytest                                                 # needs a local Postgres, see TEST_DB_URL in tests/conftest.py
+```
+Changing a model? `tortoise -c app.tortoise_conf.TORTOISE_ORM makemigrations` then `migrate`.
+
+> **Rotate your Neon password.** The connection string was pasted into a chat, so treat it as exposed
+> (Neon console → Roles → reset password). It is intentionally **not** in this zip; only `.env` holds it.
+
+## Tortoise specifics worth knowing
+- Models live in `app/models.py`; migrations use Tortoise's built-in migration framework (`app/migrations`).
+  `0001_initial` is auto-generated from the models. `0002_partition_events_and_seed` is hand-written (RunSQL):
+  it turns `events` into a monthly **range-partitioned** table, adds retention helpers, the order-number
+  sequence and the product seed. The ORM can't express partitioning, and the Event model state is unchanged, so
+  `makemigrations` will not undo it. Tortoise needs a single-column pk, so the model pk is `id` while the real
+  table's primary key is `(occurred_at, id)` (required for partitioning). The API only inserts and reads events.
+- Neon URL handling (`app/db.py`): `sslmode=require` becomes a verified asyncpg SSL context; `channel_binding` is dropped
+  (asyncpg doesn't do it and Neon doesn't require clients to); `statement_cache_size=0` keeps the pooled (PgBouncer)
+  endpoint happy. Set `NEON_DB_URL_DIRECT` (non-pooler host) and the CLI will use it for migrations.
+- Tortoise 1.x keeps its state in a contextvar, so `Tortoise.init(..., _enable_global_fallback=True)` is used in the
+  FastAPI lifespan so request tasks can see it. Don't call `generate_schemas()`; migrations own the schema.
+
+## Data model
+| Table | Purpose |
+|---|---|
+| `visitors` | one row per browser (client-generated UUID), first-touch source/UTM, hashed IP, `customer_id` once identified |
+| `sessions` | 30-min activity windows, landing page, referrer, UTM |
+| `events` | append-only click-stream, partitioned monthly, JSONB `props` |
+| `customers` | unique by (lower-cased) email; filled at checkout, which also links the visitor's earlier anonymous history |
+| `orders`, `order_items`, `payments` | server-priced orders (`product` / `gift` / `booking`), status machine, payment log |
+| `products` | price list (seeded from the storefront). The API never trusts client prices |
+| `leads` | corporate quote requests |
+
+## Endpoints
+Public: `POST /v1/track` (batch, 202) · `POST /v1/orders` (`Idempotency-Key` header) · `POST /v1/leads` · `GET /healthz` · `GET /readyz`
+Admin (`X-Admin-Key`): `GET /v1/admin/orders` · `PATCH /v1/admin/orders/{id}/status` · `GET /v1/admin/visitors/{id}/journey` · `GET /v1/admin/analytics/funnel` · `GET /v1/admin/analytics/sources`
+
+Booking stays "pending" until you mark it `paid` (your flow verifies a bank transfer by hand). Amounts are decimal strings in PKR.
+
+Gift / booking requests (replace the old Express `server/`): `POST /v1/gifts/request` · `POST /v1/bookings/request`.
+Multipart form: `data` (JSON with `order_id` from `POST /v1/orders`, plus the screening answers for bookings) and
+`receipt` (PNG/JPG/GIF/WebP/PDF, max 5 MB, type checked from the file bytes). The team gets an email with the
+receipt attached (and the voucher PDF for emailed gifts); the customer / gift recipient gets a confirmation.
+Recipient, totals and contact details are read from the order, not from the request. Screening answers are only
+emailed, never stored. Each order can be submitted once; if email fails, nothing is marked and the user can retry.
+Needs `MAIL_USERNAME` / `MAIL_PASSWORD` (Gmail app password); without them these endpoints return 503.
+
+## Wire up the React site
+Copy `client/tracker.js` to `src/utils/tracker.js`, set `VITE_API_URL`, then:
+```jsx
+// App.jsx
+const { pathname } = useLocation();
+useEffect(() => { trackPageView(); }, [pathname]);
+// add(): track('add_to_cart', { product_id: x.id })      Product page: track('product_view', { product_id: id })
+// Cart "Checkout": track('begin_checkout'); then await createOrder({ kind:'product', customer:{name,email,phone}, items:[{product_id,quantity}] })
+// Gift: createOrder({ kind:'gift', customer, quantity:n, delivery:how, recipient:who, message:msg })
+// Book (final step): createOrder({ kind:'booking', customer, preferred_date, preferred_time })
+// Corporate: createLead({ name, email, team_size, message })
+```
+The cart and checkout currently have no customer form: add name/email/phone fields before calling `createOrder`.
+
+## Privacy: please read
+- The booking form collects mental-health screening answers (self-harm, suicidal thoughts, medical history). **This service does not accept or store them**: the booking order schema rejects unknown fields. Keep that data out of analytics `props` too. If you must store it, use a separate encrypted store with its own access controls.
+- IPs are stored only as a keyed hash. Raw IPs never touch the database.
+- Call `setTracking(false)` until the visitor consents where your jurisdiction requires it.
+
+## Why it is fast and scales
+- **Write-behind ingestion:** `/v1/track` only enqueues (no DB round-trip); one task batches visitor/session upserts plus a bulk event insert into Postgres per ~1s. Trade-off: events still in memory are lost on a hard crash. A graceful shutdown flushes the queue.
+- `last_seen_at` uses server receive time, so late or skewed client clocks can't move it backwards; first-touch fields are never overwritten.
+- **Monthly partitions** keep indexes small and make retention a metadata operation: `SELECT drop_event_partitions_older_than(13);`. New partitions are created automatically every 6h.
+- Scale out by adding instances (stateless apart from the buffer). Keep `workers × DB_POOL_MAX` within your Neon pooler limits and add edge rate limiting (the built-in limiter is per process).
+- Later, if event volume explodes: ship `events` to a warehouse; the table is append-only with no foreign keys for this reason.

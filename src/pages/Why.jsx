@@ -65,7 +65,7 @@ export default function Why() {
           'Panik matches you with a licensed professional.',
           'You begin your session.',
         ].map((t, i) => (
-          <div className="card" key={t} style={{ boxShadow: '0 12px 32px rgba(255,210,63,.3)' }}>
+          <div className="card" key={t} style={{ boxShadow: '0 12px 32px rgba(109,40,217,.18)' }}>
             <div className="num">0{i + 1}</div>
             <b>{t}</b>
           </div>

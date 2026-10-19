@@ -1,5 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
-import Link from '../components/Link';
+import { useRef, useState } from 'react';
+import { PaymentInstructions, ReceiptUpload, checkReceipt } from '../components/Payment';
+import { createOrder, sendBookingRequest, track } from '../utils/tracker';
+import { isValidEmail } from '../utils/validation';
+
+const BOOKING_PRICE = 9995;
 
 /* Booking — 6 steps */
 const CONC = [
@@ -24,7 +28,10 @@ export default function Book() {
   const [s, setS] = useState(1),
     [f, setF] = useState({ role: 'Student', distress: 1, concern: [], ampm: 'AM' }),
     [er, setEr] = useState({}),
-    [done, setDone] = useState(false);
+    [done, setDone] = useState(false),
+    [sending, setSending] = useState(false),
+    [submitError, setSubmitError] = useState('');
+  const idemKey = useRef(null);
   const set = (k, v) => setF({ ...f, [k]: v }),
     req = {
       1: ['name', 'email', 'phone', 'age'],
@@ -34,24 +41,89 @@ export default function Book() {
       5: [],
       6: ['file'],
     };
-  const next = () => {
+  const next = async () => {
     const m = {};
     req[s].forEach((k) => {
       const v = f[k];
       if (!v || (Array.isArray(v) && !v.length)) m[k] = 'This field is required.';
+      else if (k === 'email' && !isValidEmail(v)) m[k] = 'Enter a valid email address.';
+      else if (k === 'age' && !(Number.isInteger(+v) && +v >= 1 && +v <= 120)) m[k] = 'Enter your age in years.';
+      else if (k === 'file' && checkReceipt(v)) m[k] = checkReceipt(v);
     });
     setEr(m);
     if (Object.keys(m).length) return;
-    if (s === 6) setDone(true);
-    else setS(s + 1);
+    if (s !== 6) {
+      track('booking_step', { step: s + 1 });
+      setS(s + 1);
+      return;
+    }
+
+    setSending(true);
+    setSubmitError('');
+    try {
+      // The order holds contact and scheduling only; screening answers are emailed, never stored.
+      idemKey.current ??= crypto.randomUUID();
+      const order = await createOrder(
+        {
+          kind: 'booking',
+          customer: { name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim() },
+          preferred_date: f.date,
+          preferred_time: `${f.hh}:${String(f.mm).padStart(2, '0')} ${f.ampm}`,
+        },
+        idemKey.current,
+      );
+      await sendBookingRequest(
+        order.id,
+        {
+          age: +f.age,
+          role: f.role,
+          concern: f.concern,
+          desc: f.desc?.trim() || null,
+          duration: f.duration,
+          distress: f.distress,
+          danger: f.danger,
+          suicidal: f.suicidal,
+          harm: f.harm,
+          medical: f.medical,
+          treatment: f.treatment.trim(),
+          notes: f.notes.trim(),
+          consent: true,
+          coupon: f.coupon?.trim() || null,
+        },
+        f.file,
+      );
+      setDone(true);
+    } catch (error) {
+      setSubmitError(error.message || 'Unable to submit your booking request. Please try again.');
+    } finally {
+      setSending(false);
+    }
   };
-  const In = (k, label, p = {}) => (
-    <>
-      <label>{label}</label>
-      <input value={f[k] || ''} onChange={(e) => set(k, e.target.value)} {...p} />
-      {er[k] && <div className="err">{er[k]}</div>}
-    </>
-  );
+  const In = (k, label, p = {}) => {
+    const emailError =
+      k === 'email' && f.email && !isValidEmail(f.email) ? 'Enter a valid email address.' : '';
+    const fieldError = emailError || (k === 'email' && f.email ? '' : er[k]);
+    return (
+      <>
+        <label>{label}</label>
+        <input
+          value={f[k] || ''}
+          onChange={(e) => {
+            set(k, e.target.value);
+            if (k === 'email') setSubmitError('');
+          }}
+          aria-invalid={Boolean(fieldError)}
+          aria-describedby={fieldError ? `${k}-error` : undefined}
+          {...p}
+        />
+        {fieldError && (
+          <div className="err" id={`${k}-error`} role={k === 'email' ? 'alert' : undefined}>
+            {fieldError}
+          </div>
+        )}
+      </>
+    );
+  };
   const Sel = (k, label, o) => (
     <>
       <label>{label}</label>
@@ -86,7 +158,7 @@ export default function Book() {
       {done ? (
         <div className="card" style={{ marginTop: 20 }}>
           <h2>Thank you!</h2>
-          <p>We’ll schedule your consultation once your payment is verified.</p>
+          <p>We’ve emailed you a confirmation. We’ll schedule your consultation once your payment is verified.</p>
         </div>
       ) : (
         <div className="card" style={{ marginTop: 20 }}>
@@ -209,58 +281,50 @@ export default function Book() {
                   onChange={(e) => set('consent', e.target.checked)}
                 />{' '}
                 Consent * — I consent to Panik404 contacting me about this request and understand that this
-                form is not an emergency service.
+                form is not an emergency service. I understand that my booking and health-related answers
+                will be emailed to Panik404 for appointment coordination.
               </label>
               {er.consent && <div className="err">{er.consent}</div>}
             </>
           )}
           {s === 5 && (
-            <>
-              {In('coupon', 'Coupon Code/Employee ID')}
-              <h3 style={{ fontSize: '1.2rem' }}>Payment Instructions</h3>
-              <p>
-                Please transfer <b>PKR 9,995</b> for your 45-minute 1-on-1 Zoom consultation to:
-              </p>
-              <p>
-                Account Name: PANIK
-                <br />
-                Account Number: 0346401103052
-                <br />
-                IBAN: PK33UNIL0109000401103052
-                <br />
-                Bank: United Bank Limited (0346)
-                <br />
-                SWIFT: UNILPKKA
-              </p>
-              <p>
-                <b>Important:</b> After payment, keep a screenshot or receipt. You’ll upload it on the next
-                step. Your consultation will be scheduled after your payment has been successfully verified.
-              </p>
-            </>
+            <PaymentInstructions
+              idPrefix="book"
+              amount={BOOKING_PRICE}
+              purpose="your 45-minute 1-on-1 online consultation (Google Meet)"
+              confirmation="Your consultation will be scheduled after your payment has been successfully verified."
+              coupon={f.coupon}
+              onCoupon={(v) => set('coupon', v)}
+            />
           )}
           {s === 6 && (
-            <>
-              <label>Please Upload Your Payment Screenshot For Confirmation *</label>
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                onChange={(e) => set('file', e.target.files[0]?.name || '')}
-              />
-              {er.file && <div className="err">{er.file}</div>}
-            </>
+            <ReceiptUpload
+              idPrefix="book"
+              file={f.file}
+              onFile={(file) => {
+                set('file', file);
+                setEr({ ...er, file: file ? checkReceipt(file) : '' });
+              }}
+              error={er.file}
+            />
           )}
           <div className="row sp" style={{ marginTop: 20 }}>
             {s > 1 ? (
-              <button className="btn ghost" onClick={() => setS(s - 1)}>
+              <button className="btn ghost" disabled={sending} onClick={() => setS(s - 1)}>
                 Previous
               </button>
             ) : (
               <span />
             )}
-            <button className="btn pu" onClick={next}>
-              {s === 6 ? 'Book A Session →' : 'Next'}
+            <button className="btn pu" disabled={sending} onClick={next}>
+              {sending ? 'Sending…' : s === 6 ? 'Book A Session →' : 'Next'}
             </button>
           </div>
+          {submitError && (
+            <p className="err mail-status error" role="alert">
+              {submitError}
+            </p>
+          )}
         </div>
       )}
       <div className="safety">

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Routes, Route, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Routes, Route, useLocation, useParams } from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
@@ -11,6 +11,7 @@ import Why from './pages/Why';
 import Gift from './pages/Gift';
 import Book from './pages/Book';
 import Corporate from './pages/Corporate';
+import { track, trackPageView } from './utils/tracker';
 
 function ShopRoute({ add }) {
   const { sort } = useParams();
@@ -24,12 +25,18 @@ function ProductRoute({ add }) {
 
 export default function App() {
   const [cart, setCart] = useState([]);
-  const add = (x) =>
+  const { pathname } = useLocation();
+  useEffect(() => {
+    trackPageView(pathname);
+  }, [pathname]);
+  const add = (x) => {
+    track('add_to_cart', { product_id: x.id });
     setCart((c) =>
       c.find((i) => i.id === x.id)
         ? c.map((i) => (i.id === x.id ? { ...i, q: i.q + 1 } : i))
         : [...c, { id: x.id, name: x.name, price: x.price, q: 1 }],
     );
+  };
   const count = cart.reduce((s, c) => s + c.q, 0);
 
   return (

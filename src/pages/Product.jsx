@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from '../components/Link';
 import { P } from '../data/products';
+import { track } from '../utils/tracker';
 
 export default function Product({ id, add }) {
   const p = P.find((x) => x.id === id);
+  useEffect(() => {
+    if (p) track('product_view', { product_id: p.id });
+  }, [p?.id]);
   if (!p) return <p>Not found.</p>;
   return (
     <>

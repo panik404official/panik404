@@ -26,24 +26,26 @@ export default function Story() {
       wrap = wr.current,
       w = () => stg.clientWidth,
       h = () => stg.clientHeight;
-    let topPx = 76;
+    let headerHeight = 0;
     const hd = document.querySelector('header'),
       fit = () => {
-        topPx = hd.offsetHeight + (parseFloat(getComputedStyle(hd).top) || 0);
-        stg.style.top = topPx + 'px';
-        stg.style.height = 'calc(100vh - ' + topPx + 'px)';
+        headerHeight = hd.offsetHeight + (parseFloat(getComputedStyle(hd).top) || 0);
+        wrap.style.setProperty(
+          '--header-height',
+          headerHeight + 'px',
+        );
       };
     fit();
     const sc = new THREE.Scene(),
       cam = new THREE.PerspectiveCamera(42, w() / h(), 0.1, 100),
       rd = new THREE.WebGLRenderer({ canvas: el, antialias: true });
     rd.setPixelRatio(Math.min(devicePixelRatio, 2));
-    const bgN = new THREE.Color(0x1b1033),
-      bgM = new THREE.Color(0x3a2570),
-      bgD = new THREE.Color(0xf3ecff),
+    const bgN = new THREE.Color(0xffffff),
+      bgM = new THREE.Color(0xffffff),
+      bgD = new THREE.Color(0xffffff),
       bg = new THREE.Color();
-    const amb = new THREE.AmbientLight(0xffffff, 0.4),
-      dl = new THREE.DirectionalLight(0xffffff, 0.55);
+    const amb = new THREE.AmbientLight(0xffffff, 0.5),
+      dl = new THREE.DirectionalLight(0xffffff, 0.45);
     dl.position.set(3, 6, 5);
     sc.add(amb, dl);
     const M = (c, o) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75, ...o }),
@@ -57,14 +59,17 @@ export default function Story() {
       room = new THREE.Group();
     sc.add(off, room);
     /* ---- night office ---- */
-    const f1 = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), M(0x2a1850));
+    const f1 = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), M(0xf6f2fc, { emissive: 0xf6f2fc }));
     f1.rotation.x = -Math.PI / 2;
     off.add(f1);
-    B(18, 8, 0.1, 0x2b1a55, 0, 3, -2.8, off);
-    B(3, 2.3, 0.05, 0x160c30, -2.4, 2.7, -2.7, off, { emissive: 0x24184a });
+    const nrug = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 0.02, 48), M(0xefe6ff));
+    nrug.position.y = 0.01;
+    off.add(nrug);
+    B(18, 8, 0.1, 0xfbf9ff, 0, 3, -2.8, off, { emissive: 0xfbf9ff });
+    B(3, 2.3, 0.05, 0xd9e0ff, -2.4, 2.7, -2.7, off, { emissive: 0xd9e0ff });
     const moon = new THREE.Mesh(
       new THREE.SphereGeometry(0.32, 20, 20),
-      new THREE.MeshBasicMaterial({ color: 0xfff4cf }),
+      new THREE.MeshBasicMaterial({ color: 0xcdbbff }),
     );
     moon.position.set(-2.1, 3.1, -2.62);
     off.add(moon);
@@ -72,27 +77,27 @@ export default function Story() {
       sa = new Float32Array(90);
     for (let i = 0; i < 30; i++) sa.set([-3.7 + Math.random() * 2.6, 1.7 + Math.random() * 2, -2.64], i * 3);
     sg.setAttribute('position', new THREE.BufferAttribute(sa, 3));
-    off.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 0.05 })));
-    B(2.6, 0.08, 1, 0x7a5aa6, 0, 1, 1.1, off);
+    off.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 0.06 })));
+    B(2.6, 0.08, 1, 0xe9defc, 0, 1, 1.1, off);
     [
       [-1.2, 0.65],
       [1.2, 0.65],
       [-1.2, 1.55],
       [1.2, 1.55],
-    ].forEach(([x, z]) => B(0.08, 1, 0.08, 0x5b3f86, x, 0.5, z, off));
-    B(1, 0.1, 0.9, 0x6d28d9, 0, 0.45, 0, off);
-    B(1, 1.2, 0.1, 0x6d28d9, 0, 1.05, -0.45, off);
-    B(1, 0.04, 0.7, 0xd9d4e8, 0, 1.06, 1.1, off);
-    const scr = B(1, 0.65, 0.03, 0xe9e3ff, 0, 1.4, 1.45, off, { emissive: 0xb9a7ff, emissiveIntensity: 0.9 });
+    ].forEach(([x, z]) => B(0.08, 1, 0.08, 0xd7c8f0, x, 0.5, z, off));
+    B(1, 0.1, 0.9, 0xe2d6fa, 0, 0.45, 0, off);
+    B(1, 1.2, 0.1, 0xe2d6fa, 0, 1.05, -0.45, off);
+    B(1, 0.04, 0.7, 0xe9e6f2, 0, 1.06, 1.1, off);
+    const scr = B(1, 0.65, 0.03, 0xeef3ff, 0, 1.4, 1.45, off, { emissive: 0xcfe0ff, emissiveIntensity: 0.7 });
     scr.rotation.x = 0.18;
-    const lp = new THREE.PointLight(0xb9a7ff, 1.6, 7);
+    const lp = new THREE.PointLight(0xcfe0ff, 0.3, 6);
     lp.position.set(0, 1.6, 1.1);
     off.add(lp);
-    const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.09, 0.18, 14), M(0xf3ecff));
+    const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.09, 0.18, 14), M(0xffc8dd));
     mug.position.set(1, 1.14, 1);
     off.add(mug);
     const tabs = TABS.map((l, i) => {
-      const { t, draw } = tabTex(l),
+      const { t, draw } = tabTex(l, i),
         m = new THREE.Mesh(
           new THREE.PlaneGeometry(1.6, 0.99),
           new THREE.MeshBasicMaterial({ map: t, transparent: true, side: THREE.DoubleSide }),
@@ -109,7 +114,7 @@ export default function Story() {
       draw();
       return { m, draw };
     });
-    const bk = tabTex('Book a session', '✓'),
+    const bk = tabTex('Book a session', 5, '✓'),
       book = new THREE.Mesh(
         new THREE.PlaneGeometry(1.8, 1.11),
         new THREE.MeshBasicMaterial({ map: bk.t, transparent: true, side: THREE.DoubleSide }),
@@ -123,7 +128,7 @@ export default function Story() {
         bk.draw();
       });
     const cloud = new THREE.Group(),
-      cM = M(0x6b5b95, { emissive: 0x2a1b55, transparent: true });
+      cM = M(0xddd3f3, { emissive: 0x4a4560, roughness: 0.95, transparent: true });
     cloud.position.set(0, 3.5, 0);
     off.add(cloud);
     [
@@ -139,22 +144,22 @@ export default function Story() {
     });
     const bolt = new THREE.Line(
       new THREE.BufferGeometry(),
-      new THREE.LineBasicMaterial({ color: 0xffd23f, transparent: true }),
+      new THREE.LineBasicMaterial({ color: 0xc4b5fd, transparent: true }),
     );
     cloud.add(bolt);
     /* ---- morning therapy room ---- */
-    const f2 = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), M(0xf6efff));
+    const f2 = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), M(0xf7f3ff, { emissive: 0xf7f3ff }));
     f2.rotation.x = -Math.PI / 2;
     room.add(f2);
-    B(18, 8, 0.1, 0xede4ff, 0, 3, -3.3, room);
-    B(3.6, 2.5, 0.05, 0xfff6d6, 0, 2.5, -3.2, room, { emissive: 0xfff0b0, emissiveIntensity: 0.7 });
+    B(18, 8, 0.1, 0xffffff, 0, 3, -3.3, room, { emissive: 0xffffff });
+    B(3.6, 2.5, 0.05, 0xf2ecff, 0, 2.5, -3.2, room, { emissive: 0xf2ecff });
     const sun = new THREE.Mesh(
       new THREE.SphereGeometry(0.45, 24, 24),
-      new THREE.MeshBasicMaterial({ color: 0xffd23f }),
+      new THREE.MeshBasicMaterial({ color: 0xc4b5fd }),
     );
     sun.position.z = -3.1;
     room.add(sun);
-    const rug = new THREE.Mesh(new THREE.CylinderGeometry(3.3, 3.3, 0.02, 48), M(0xddd0fb));
+    const rug = new THREE.Mesh(new THREE.CylinderGeometry(3.3, 3.3, 0.02, 48), M(0xefe6ff, { roughness: 1 }));
     rug.position.y = 0.01;
     room.add(rug);
     const chair = (c, x, ry) => {
@@ -167,88 +172,89 @@ export default function Story() {
       B(0.16, 0.55, 1, c, -0.63, 0.5, 0, g);
       B(0.16, 0.55, 1, c, 0.63, 0.5, 0, g);
     };
-    chair(0xa78bfa, -1.5, Math.PI / 2);
-    chair(0x7c3aed, 1.5, -Math.PI / 2);
-    const tb = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.06, 24), M(0xffffff));
+    chair(0xd4c3fa, -1.5, Math.PI / 2);
+    chair(0xbfe8d6, 1.5, -Math.PI / 2);
+    const tb = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.06, 24), M(0xffffff, { roughness: 0.3 }));
     tb.position.set(0, 0.6, -1.3);
     room.add(tb);
-    B(0.08, 0.6, 0.08, 0xc4b5fd, 0, 0.3, -1.3, room);
-    B(0.3, 0.14, 0.2, 0xffffff, -0.1, 0.7, -1.3, room);
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.22, 0.45, 16), M(0xc4b5fd));
+    B(0.08, 0.6, 0.08, 0xe3d9ff, 0, 0.3, -1.3, room);
+    B(0.3, 0.14, 0.2, 0xffe0ec, -0.1, 0.7, -1.3, room);
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.22, 0.45, 16), M(0xffd3e4));
     pot.position.set(-3.5, 0.22, -1.8);
     room.add(pot);
     for (let i = 0; i < 8; i++) {
-      const l = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), M(i % 3 ? 0x34c38f : 0x2fa876));
+      const l = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), M(i % 3 ? 0xa7dcb6 : 0x8ecfa4));
       l.scale.set(0.35, 1, 0.2);
       const a = (i / 8) * 6.28;
       l.position.set(-3.5 + Math.cos(a) * 0.25, 0.95 + (i % 3) * 0.2, -1.8 + Math.sin(a) * 0.25);
       l.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.6);
       room.add(l);
     }
-    B(0.06, 2, 0.06, 0xc4b5fd, 3.5, 1, -1.6, room);
+    B(0.06, 2, 0.06, 0xe3d9ff, 3.5, 1, -1.6, room);
     const shade = new THREE.Mesh(
       new THREE.SphereGeometry(0.34, 16, 16),
-      new THREE.MeshBasicMaterial({ color: 0xffe08a }),
+      new THREE.MeshBasicMaterial({ color: 0xcdbbff }),
     );
     shade.position.set(3.5, 2.1, -1.6);
     room.add(shade);
-    const wl = new THREE.PointLight(0xffe2a0, 1.1, 9);
+    const wl = new THREE.PointLight(0xc4b5fd, 0.6, 9);
     wl.position.set(3.4, 2.2, -1);
     room.add(wl);
     const orb = new THREE.Mesh(
       new THREE.SphereGeometry(0.4, 24, 24),
-      new THREE.MeshBasicMaterial({ color: 0xc4b5fd, transparent: true, opacity: 0.9 }),
+      new THREE.MeshBasicMaterial({ color: 0xcdbbff, transparent: true, opacity: 0.9 }),
     );
     orb.position.set(0, 2.7, 0);
     room.add(orb);
     const halo = new THREE.Mesh(
       new THREE.SphereGeometry(0.8, 24, 24),
-      new THREE.MeshBasicMaterial({ color: 0xddd6fe, transparent: true, opacity: 0.35 }),
+      new THREE.MeshBasicMaterial({ color: 0xffd6e8, transparent: true, opacity: 0.35 }),
     );
     halo.position.copy(orb.position);
     room.add(halo);
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(1.1, 0.025, 10, 80),
-      new THREE.MeshBasicMaterial({ color: 0x34c38f, transparent: true }),
+      new THREE.MeshBasicMaterial({ color: 0x9fe3c2, transparent: true }),
     );
     ring.position.copy(orb.position);
     ring.rotation.x = Math.PI / 2.4;
     room.add(ring);
     const N = 60,
+      DUST = [0xd8c7ff, 0xbda4ff, 0xe3d9ff, 0xc4b5fd, 0xdcd0ff, 0xa78bfa],
       dg = new THREE.BufferGeometry(),
-      da = new Float32Array(N * 3);
-    for (let i = 0; i < N; i++)
+      da = new Float32Array(N * 3),
+      dc = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
       da.set([(Math.random() - 0.5) * 9, Math.random() * 4, (Math.random() - 0.5) * 4], i * 3);
+      const c = new THREE.Color(DUST[i % DUST.length]);
+      dc.set([c.r, c.g, c.b], i * 3);
+    }
     dg.setAttribute('position', new THREE.BufferAttribute(da, 3));
+    dg.setAttribute('color', new THREE.BufferAttribute(dc, 3));
     room.add(
       new THREE.Points(
         dg,
-        new THREE.PointsMaterial({ color: 0xffe08a, size: 0.06, transparent: true, opacity: 0.7 }),
+        new THREE.PointsMaterial({ size: 0.08, vertexColors: true, transparent: true, opacity: 0.85 }),
       ),
     );
     /* ---- people ---- */
     const girl = figure({
-        skin: 0xf0c4a0,
-        hair: 0x3a2650,
-        top: 0xa78bfa,
-        top2: 0x8b5cf6,
-        pants: 0x4c1d95,
-        style: 'long',
-        hoodie: true,
+        skin: 0xf6cfb3,
+        hair: 0x6b4f3f,
+        top: 0xdccdfc,
+        pants: 0xbcd5f2,
+        shoe: 0xffd3e4,
       }),
       th = figure({
-        skin: 0xd9a77f,
-        hair: 0x1f1235,
-        top: 0x7c3aed,
-        top2: 0xffffff,
-        pants: 0x2e1065,
-        style: 'bob',
-        glasses: true,
-        cardigan: true,
+        skin: 0xd9aa8a,
+        hair: 0x3f3232,
+        top: 0xc2ead8,
+        pants: 0xb3aecb,
+        shoe: 0xdcd0ff,
       });
     sc.add(girl.root, th.root);
-    const phone = B(0.12, 0.2, 0.02, 0xddd6fe, 0, -0.5, 0.06, girl.arms[1].el, {
-        emissive: 0x8b5cf6,
+    const phone = B(0.12, 0.2, 0.02, 0xf2ecff, 0, -0.5, 0.06, girl.arms[1].el, {
+        emissive: 0xd4c6ff,
         emissiveIntensity: 0.6,
       }),
       note = B(0.2, 0.26, 0.03, 0xffffff, 0, -0.5, 0.06, th.arms[1].el);
@@ -258,7 +264,7 @@ export default function Story() {
       PR = [-0.02, 0, -0.15, -0.9, -0.15, -0.9, 0.05, 0.2, 0.1];
     /* ---- bursts when a tab closes ---- */
     const bursts = [],
-      PAL = [0x8b5cf6, 0xa78bfa, 0x7c3aed, 0xc4b5fd, 0xddd6fe, 0x8b5cf6, 0xffd23f, 0x34c38f];
+      PAL = [0xcdb4ff, 0xa78bfa, 0xe3d9ff, 0xbda4ff, 0xcdb4ff, 0x9b7bea];
     const burst = (p) => {
       const n = 40,
         bg2 = new THREE.BufferGeometry(),
@@ -328,14 +334,16 @@ export default function Story() {
       const dt = Math.min(ck.getDelta(), 0.05),
         t = ck.elapsedTime,
         r = wrap.getBoundingClientRect();
-      ps += (Math.min(1, Math.max(0, (topPx - r.top) / Math.max(1, r.height - stg.clientHeight))) - ps) * 0.1;
+      const raw = (headerHeight - r.top) / Math.max(1, r.height - stg.clientHeight);
+      hd.classList.toggle('over-story', raw < 1);
+      ps += (Math.min(1, Math.max(0, raw)) - ps) * 0.1;
       const p = ps,
         day = p >= 0.575;
       off.visible = !day;
       room.visible = day;
       th.root.visible = day;
       rd.setClearColor(day ? bgD : bg.copy(bgN).lerp(bgM, ss(0.2, 0.56, p)));
-      amb.intensity = day ? 0.95 : 0.4 + 0.2 * ss(0.45, 0.56, p);
+      amb.intensity = day ? 0.6 : 0.5 + 0.1 * ss(0.45, 0.56, p);
       /* her pose */
       let wT = 0,
         wH = 0,
@@ -456,6 +464,7 @@ export default function Story() {
     loop();
     return () => {
       cancelAnimationFrame(id);
+      hd.classList.remove('over-story');
       removeEventListener('resize', rs);
       rd.dispose();
     };
@@ -468,17 +477,17 @@ export default function Story() {
           aria-label="Illustrated story: a stressed young woman books a session and starts therapy"
         />
         <div className="shero" ref={hero}>
-          <span className="tag ye">Mental health, minus the awkwardness</span>
+          <span className="tag accent">Mental health, minus the awkwardness</span>
           <h1 style={{ margin: '14px 0' }}>Your brain has enough tabs open.</h1>
           <p>
             Talk to a licensed professional, or use a guided journal for the thoughts that keep looping.
             Panik404 helps you close them — one tab at a time.
           </p>
           <div className="row">
-            <Link className="btn wh" to="/book-a-session">
+            <Link className="btn" to="/book-a-session">
               Talk to someone
             </Link>
-            <Link className="btn gl" to="/shop">
+            <Link className="btn ghost" to="/shop">
               Explore journals
             </Link>
           </div>

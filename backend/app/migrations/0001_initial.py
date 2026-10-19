@@ -1,0 +1,163 @@
+from tortoise import migrations
+from tortoise.migrations import operations as ops
+import functools
+from json import dumps, loads
+from tortoise.fields.base import OnDelete
+from uuid import uuid4
+from tortoise import fields
+
+class Migration(migrations.Migration):
+    initial = True
+
+    operations = [
+        ops.CreateModel(
+            name='Customer',
+            fields=[
+                ('id', fields.UUIDField(primary_key=True, default=uuid4, unique=True, db_index=True)),
+                ('email', fields.CharField(unique=True, max_length=320)),
+                ('name', fields.CharField(null=True, max_length=120)),
+                ('phone', fields.CharField(null=True, max_length=32)),
+                ('created_at', fields.DatetimeField(auto_now=False, auto_now_add=True)),
+                ('updated_at', fields.DatetimeField(auto_now=True, auto_now_add=False)),
+            ],
+            options={'table': 'customers', 'app': 'models', 'pk_attr': 'id'},
+            bases=['Model'],
+        ),
+        ops.CreateModel(
+            name='Event',
+            fields=[
+                ('id', fields.BigIntField(generated=True, primary_key=True, unique=True, db_index=True)),
+                ('occurred_at', fields.DatetimeField(auto_now=False, auto_now_add=False)),
+                ('visitor_id', fields.UUIDField()),
+                ('session_id', fields.UUIDField()),
+                ('type', fields.CharField(max_length=32)),
+                ('path', fields.CharField(null=True, max_length=500)),
+                ('props', fields.JSONField(default=dict, encoder=functools.partial(dumps, separators=(',', ':')), decoder=loads)),
+                ('received_at', fields.DatetimeField(auto_now=False, auto_now_add=True)),
+            ],
+            options={'table': 'events', 'app': 'models', 'pk_attr': 'id', 'table_description': 'Append-only click-stream. The real table is RANGE-partitioned by month (see migration 0002):'},
+            bases=['Model'],
+        ),
+        ops.CreateModel(
+            name='Product',
+            fields=[
+                ('id', fields.CharField(primary_key=True, unique=True, db_index=True, max_length=100)),
+                ('name', fields.CharField(max_length=200)),
+                ('kind', fields.CharField(max_length=16)),
+                ('unit_price', fields.DecimalField(max_digits=12, decimal_places=2)),
+                ('active', fields.BooleanField(default=True)),
+                ('created_at', fields.DatetimeField(auto_now=False, auto_now_add=True)),
+            ],
+            options={'table': 'products', 'app': 'models', 'pk_attr': 'id'},
+            bases=['Model'],
+        ),
+        ops.CreateModel(
+            name='Visitor',
+            fields=[
+                ('id', fields.UUIDField(primary_key=True, default=uuid4, unique=True, db_index=True)),
+                ('customer', fields.ForeignKeyField('models.Customer', source_field='customer_id', null=True, db_constraint=True, to_field='id', related_name='visitors', on_delete=OnDelete.SET_NULL)),
+                ('first_seen_at', fields.DatetimeField(db_index=True, auto_now=False, auto_now_add=False)),
+                ('last_seen_at', fields.DatetimeField(auto_now=False, auto_now_add=False)),
+                ('first_landing_path', fields.CharField(null=True, max_length=500)),
+                ('first_referrer', fields.CharField(null=True, max_length=500)),
+                ('first_referrer_host', fields.CharField(null=True, max_length=255)),
+                ('first_utm_source', fields.CharField(null=True, max_length=200)),
+                ('first_utm_medium', fields.CharField(null=True, max_length=200)),
+                ('first_utm_campaign', fields.CharField(null=True, max_length=200)),
+                ('first_source', fields.CharField(default='direct', max_length=255)),
+                ('user_agent', fields.CharField(null=True, max_length=300)),
+                ('ip_hash', fields.CharField(null=True, max_length=64)),
+                ('country', fields.CharField(null=True, max_length=2)),
+            ],
+            options={'table': 'visitors', 'app': 'models', 'pk_attr': 'id', 'table_description': 'One row per browser (id is generated client-side).'},
+            bases=['Model'],
+        ),
+        ops.CreateModel(
+            name='Session',
+            fields=[
+                ('id', fields.UUIDField(primary_key=True, default=uuid4, unique=True, db_index=True)),
+                ('visitor', fields.ForeignKeyField('models.Visitor', source_field='visitor_id', db_constraint=True, to_field='id', related_name='sessions', on_delete=OnDelete.CASCADE)),
+                ('started_at', fields.DatetimeField(db_index=True, auto_now=False, auto_now_add=False)),
+                ('last_seen_at', fields.DatetimeField(auto_now=False, auto_now_add=False)),
+                ('landing_path', fields.CharField(null=True, max_length=500)),
+                ('referrer', fields.CharField(null=True, max_length=500)),
+                ('referrer_host', fields.CharField(null=True, max_length=255)),
+                ('utm_source', fields.CharField(null=True, max_length=200)),
+                ('utm_medium', fields.CharField(null=True, max_length=200)),
+                ('utm_campaign', fields.CharField(null=True, max_length=200)),
+                ('user_agent', fields.CharField(null=True, max_length=300)),
+                ('ip_hash', fields.CharField(null=True, max_length=64)),
+                ('country', fields.CharField(null=True, max_length=2)),
+            ],
+            options={'table': 'sessions', 'app': 'models', 'pk_attr': 'id'},
+            bases=['Model'],
+        ),
+        ops.CreateModel(
+            name='Lead',
+            fields=[
+                ('id', fields.UUIDField(primary_key=True, default=uuid4, unique=True, db_index=True)),
+                ('visitor', fields.ForeignKeyField('models.Visitor', source_field='visitor_id', null=True, db_constraint=True, to_field='id', related_name='leads', on_delete=OnDelete.SET_NULL)),
+                ('session', fields.ForeignKeyField('models.Session', source_field='session_id', null=True, db_constraint=True, to_field='id', related_name='leads', on_delete=OnDelete.SET_NULL)),
+                ('kind', fields.CharField(default='corporate', max_length=32)),
+                ('name', fields.CharField(max_length=120)),
+                ('email', fields.CharField(max_length=320)),
+                ('team_size', fields.IntField(null=True)),
+                ('message', fields.TextField(null=True, unique=False)),
+                ('created_at', fields.DatetimeField(db_index=True, auto_now=False, auto_now_add=True)),
+            ],
+            options={'table': 'leads', 'app': 'models', 'pk_attr': 'id', 'table_description': 'Corporate quote request (a lead, not a purchase).'},
+            bases=['Model'],
+        ),
+        ops.CreateModel(
+            name='Order',
+            fields=[
+                ('id', fields.UUIDField(primary_key=True, default=uuid4, unique=True, db_index=True)),
+                ('order_no', fields.BigIntField(unique=True)),
+                ('idempotency_key', fields.CharField(null=True, unique=True, max_length=100)),
+                ('visitor', fields.ForeignKeyField('models.Visitor', source_field='visitor_id', null=True, db_constraint=True, to_field='id', related_name='orders', on_delete=OnDelete.SET_NULL)),
+                ('session', fields.ForeignKeyField('models.Session', source_field='session_id', null=True, db_constraint=True, to_field='id', related_name='orders', on_delete=OnDelete.SET_NULL)),
+                ('customer', fields.ForeignKeyField('models.Customer', source_field='customer_id', db_constraint=True, to_field='id', related_name='orders', on_delete=OnDelete.RESTRICT)),
+                ('kind', fields.CharField(max_length=16)),
+                ('status', fields.CharField(default='pending', db_index=True, max_length=16)),
+                ('currency', fields.CharField(default='PKR', max_length=3)),
+                ('subtotal', fields.DecimalField(max_digits=12, decimal_places=2)),
+                ('discount', fields.DecimalField(default=0, max_digits=12, decimal_places=2)),
+                ('total', fields.DecimalField(max_digits=12, decimal_places=2)),
+                ('details', fields.JSONField(default=dict, encoder=functools.partial(dumps, separators=(',', ':')), decoder=loads)),
+                ('created_at', fields.DatetimeField(db_index=True, auto_now=False, auto_now_add=True)),
+                ('paid_at', fields.DatetimeField(null=True, auto_now=False, auto_now_add=False)),
+                ('updated_at', fields.DatetimeField(auto_now=True, auto_now_add=False)),
+            ],
+            options={'table': 'orders', 'app': 'models', 'pk_attr': 'id'},
+            bases=['Model'],
+        ),
+        ops.CreateModel(
+            name='OrderItem',
+            fields=[
+                ('id', fields.BigIntField(generated=True, primary_key=True, unique=True, db_index=True)),
+                ('order', fields.ForeignKeyField('models.Order', source_field='order_id', db_constraint=True, to_field='id', related_name='items', on_delete=OnDelete.CASCADE)),
+                ('line_no', fields.SmallIntField()),
+                ('product', fields.ForeignKeyField('models.Product', source_field='product_id', db_constraint=True, to_field='id', related_name='order_items', on_delete=OnDelete.RESTRICT)),
+                ('name', fields.CharField(max_length=200)),
+                ('unit_price', fields.DecimalField(max_digits=12, decimal_places=2)),
+                ('quantity', fields.IntField()),
+            ],
+            options={'table': 'order_items', 'app': 'models', 'unique_together': (('order', 'line_no'),), 'pk_attr': 'id'},
+            bases=['Model'],
+        ),
+        ops.CreateModel(
+            name='Payment',
+            fields=[
+                ('id', fields.UUIDField(primary_key=True, default=uuid4, unique=True, db_index=True)),
+                ('order', fields.ForeignKeyField('models.Order', source_field='order_id', db_constraint=True, to_field='id', related_name='payments', on_delete=OnDelete.CASCADE)),
+                ('provider', fields.CharField(max_length=50)),
+                ('provider_ref', fields.CharField(null=True, max_length=200)),
+                ('amount', fields.DecimalField(max_digits=12, decimal_places=2)),
+                ('status', fields.CharField(max_length=16)),
+                ('payload', fields.JSONField(default=dict, encoder=functools.partial(dumps, separators=(',', ':')), decoder=loads)),
+                ('created_at', fields.DatetimeField(auto_now=False, auto_now_add=True)),
+            ],
+            options={'table': 'payments', 'app': 'models', 'unique_together': (('provider', 'provider_ref'),), 'pk_attr': 'id'},
+            bases=['Model'],
+        ),
+    ]
