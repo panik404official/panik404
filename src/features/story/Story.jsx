@@ -480,8 +480,8 @@ export default function Story() {
           <span className="tag accent">Mental health, minus the awkwardness</span>
           <h1 style={{ margin: '14px 0' }}>Your brain has enough tabs open.</h1>
           <p>
-            Talk to a licensed professional, or use a guided journal for the thoughts that keep looping.
-            Panik404 helps you close them — one tab at a time.
+            Your brain has enough tabs open. Let’s help you close a few.
+            Connect with a licensed professional who can help you untangle your thoughts, quiet the mental noise, and feel more in control - one tab at a time.
           </p>
           <div className="row">
             <Link className="btn" to="/book-a-session">
