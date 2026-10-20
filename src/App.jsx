@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Routes, Route, useLocation, useParams } from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -13,6 +13,9 @@ import Book from './pages/Book';
 import Corporate from './pages/Corporate';
 import { track, trackPageView } from './utils/tracker';
 
+// Loaded only when someone opens #/admin, so shoppers never download the admin code.
+const AdminApp = lazy(() => import('./admin/AdminApp'));
+
 function ShopRoute({ add }) {
   const { sort } = useParams();
   return <Shop sort={sort || ''} add={add} />;
@@ -26,9 +29,10 @@ function ProductRoute({ add }) {
 export default function App() {
   const [cart, setCart] = useState([]);
   const { pathname } = useLocation();
+  const isAdmin = pathname === '/admin' || pathname.startsWith('/admin/');
   useEffect(() => {
-    trackPageView(pathname);
-  }, [pathname]);
+    if (!isAdmin) trackPageView(pathname); // admin browsing must not pollute customer analytics
+  }, [pathname, isAdmin]);
   const add = (x) => {
     track('add_to_cart', { product_id: x.id });
     setCart((c) =>
@@ -38,6 +42,13 @@ export default function App() {
     );
   };
   const count = cart.reduce((s, c) => s + c.q, 0);
+
+  if (isAdmin)
+    return (
+      <Suspense fallback={<p style={{ padding: 24 }}>Loading admin…</p>}>
+        <AdminApp />
+      </Suspense>
+    );
 
   return (
     <>

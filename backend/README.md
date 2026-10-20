@@ -42,7 +42,7 @@ Changing a model? `tortoise -c app.tortoise_conf.TORTOISE_ORM makemigrations` th
 
 ## Endpoints
 Public: `POST /v1/track` (batch, 202) · `POST /v1/orders` (`Idempotency-Key` header) · `POST /v1/leads` · `GET /healthz` · `GET /readyz`
-Admin (`X-Admin-Key`): `GET /v1/admin/orders` · `PATCH /v1/admin/orders/{id}/status` · `GET /v1/admin/visitors/{id}/journey` · `GET /v1/admin/analytics/funnel` · `GET /v1/admin/analytics/sources`
+Admin (`X-Admin-Key`): `GET /v1/admin/overview` · `GET /v1/admin/customers` (`q`, `sort`, `limit`, `offset`) · `GET /v1/admin/customers/{id}` (full profile) · `GET /v1/admin/orders` (`status`, `kind`, `q`) · `GET /v1/admin/orders/{id}` · `GET /v1/admin/visitors` · `GET /v1/admin/events` · `GET /v1/admin/leads` · `GET /v1/admin/products` · `GET /v1/admin/payments` · `PATCH /v1/admin/orders/{id}/status` · `GET /v1/admin/visitors/{id}/journey` · `GET /v1/admin/analytics/funnel` · `GET /v1/admin/analytics/sources`
 
 Booking stays "pending" until you mark it `paid` (your flow verifies a bank transfer by hand). Amounts are decimal strings in PKR.
 
@@ -53,6 +53,14 @@ receipt attached (and the voucher PDF for emailed gifts); the customer / gift re
 Recipient, totals and contact details are read from the order, not from the request. Screening answers are only
 emailed, never stored. Each order can be submitted once; if email fails, nothing is marked and the user can retry.
 Needs `MAIL_USERNAME` / `MAIL_PASSWORD` (Gmail app password); without them these endpoints return 503.
+
+## Admin panel
+Open the site at `#/admin` (e.g. `http://localhost:5173/#/admin`) and enter `ADMIN_API_KEY`. The key is kept in
+sessionStorage only. Pages: overview, customers (search, sort, CSV export), a full customer profile (contact details,
+lifetime value, every order with items/payments/gift and booking details, every device and visit, the complete
+click-stream timeline, corporate enquiries, raw JSON download), orders (mark paid/failed/cancelled/refunded),
+visitors and their journeys, live activity, leads, products and the payment log. The admin bundle is lazy-loaded and
+admin page views are not tracked. Booking screening answers are not in the panel because they are never stored.
 
 ## Wire up the React site
 Copy `client/tracker.js` to `src/utils/tracker.js`, set `VITE_API_URL`, then:

@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..repos import analytics, orders as orders_repo
+from ..repos import admin as admin_repo, analytics, orders as orders_repo
 from ..schemas import OrderOut, StatusUpdate
 from ..security import require_admin
 
@@ -24,11 +24,21 @@ def date_range(start: datetime | None = None, end: datetime | None = None) -> tu
 @router.get("/orders")
 async def list_orders(
     status: Literal["pending", "paid", "failed", "cancelled", "refunded"] | None = None,
+    kind: Literal["product", "gift", "booking"] | None = None,
+    q: str | None = Query(None, max_length=200, description="email, name, phone or order number"),
     before: datetime | None = None,
     limit: int = Query(50, ge=1, le=200),
 ):
-    rows = await analytics.list_orders(status, before, limit)
+    rows = await admin_repo.search_orders(status, kind, q, before, limit)
     return {"items": rows, "next_before": rows[-1]["created_at"] if len(rows) == limit else None}
+
+
+@router.get("/orders/{order_id}")
+async def order_detail(order_id: UUID):
+    data = await admin_repo.order_detail(order_id)
+    if data is None:
+        raise HTTPException(404, "Order not found")
+    return data
 
 
 @router.patch("/orders/{order_id}/status", response_model=OrderOut)
@@ -55,3 +65,62 @@ async def funnel(rng: tuple[datetime, datetime] = Depends(date_range)):
 @router.get("/analytics/sources")
 async def sources(rng: tuple[datetime, datetime] = Depends(date_range)):
     return {"items": await analytics.sources(*rng)}
+
+
+# ---- admin panel ---------------------------------------------------------------------------------------
+@router.get("/overview")
+async def overview():
+    return await admin_repo.overview()
+
+
+@router.get("/customers")
+async def list_customers(
+    q: str | None = Query(None, max_length=200, description="email, name or phone"),
+    sort: Literal["recent", "spent", "orders", "last_seen", "name"] = "recent",
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    return await admin_repo.list_customers(q, sort, limit, offset)
+
+
+@router.get("/customers/{customer_id}")
+async def customer_profile(customer_id: UUID, event_limit: int = Query(2000, ge=1, le=10000)):
+    data = await admin_repo.customer_profile(customer_id, event_limit)
+    if data is None:
+        raise HTTPException(404, "Customer not found")
+    return data
+
+
+@router.get("/visitors")
+async def list_visitors(
+    identified: bool | None = None,
+    q: str | None = Query(None, max_length=200),
+    before: datetime | None = None,
+    limit: int = Query(50, ge=1, le=200),
+):
+    rows = await admin_repo.list_visitors(identified, q, before, limit)
+    return {"items": rows, "next_before": rows[-1]["last_seen_at"] if len(rows) == limit else None}
+
+
+@router.get("/leads")
+async def list_leads(q: str | None = Query(None, max_length=200), before: datetime | None = None,
+                     limit: int = Query(50, ge=1, le=200)):
+    rows = await admin_repo.list_leads(q, before, limit)
+    return {"items": rows, "next_before": rows[-1]["created_at"] if len(rows) == limit else None}
+
+
+@router.get("/events")
+async def live_events(type: str | None = Query(None, max_length=32), before: datetime | None = None,
+                      limit: int = Query(100, ge=1, le=500)):
+    rows = await admin_repo.live_events(type, before, limit)
+    return {"items": rows, "next_before": rows[-1]["occurred_at"] if len(rows) == limit else None}
+
+
+@router.get("/products")
+async def products():
+    return {"items": await admin_repo.products()}
+
+
+@router.get("/payments")
+async def payments(limit: int = Query(100, ge=1, le=500)):
+    return {"items": await admin_repo.payments(limit)}
