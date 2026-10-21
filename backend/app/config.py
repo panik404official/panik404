@@ -28,9 +28,13 @@ class Settings(BaseSettings):
     rate_limit_track_per_min: int = 120
     rate_limit_orders_per_min: int = 20
     rate_limit_intake_per_15min: int = 5  # gift / booking request emails
+    rate_limit_contact_per_15min: int = 5
+    rate_limit_consent_per_min: int = 240  # consent forms autosave while people type
 
     # Outgoing mail (Gmail SMTP with an app password). Requests that send email fail with 503 until set.
     admin_email: str = "ethancarter.signmakerz@gmail.com"
+    contact_email: str | None = None  # Contact us messages go here (defaults to admin_email)
+    consent_email: str | None = None  # signed consent forms go here (defaults to admin_email)
     mail_username: str | None = None
     mail_password: str | None = None
     mail_from: str | None = None

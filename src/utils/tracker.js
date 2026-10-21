@@ -123,3 +123,5 @@ export const sendBookingRequest = (orderId, fields, receipt) =>
 export const createOrder = (payload, idempotencyKey = crypto.randomUUID()) =>
   post('/v1/orders', payload, { 'Idempotency-Key': idempotencyKey });
 export const createLead = (payload) => post('/v1/leads', payload);
+/** Contact us: emails the team and sends the visitor a copy. */
+export const sendContact = (payload) => post('/v1/contact', payload);

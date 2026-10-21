@@ -54,6 +54,21 @@ Recipient, totals and contact details are read from the order, not from the requ
 emailed, never stored. Each order can be submitted once; if email fails, nothing is marked and the user can retry.
 Needs `MAIL_USERNAME` / `MAIL_PASSWORD` (Gmail app password); without them these endpoints return 503.
 
+## Contact us and consent forms
+Contact: `POST /v1/contact` (JSON: name, email, phone?, topic, message). Emails the team (reply-to = sender) and sends the
+sender a copy; stored in `contact_messages`. If email fails nothing is stored, so a retry leaves no duplicate.
+
+Consent forms (migration `0003`): an admin creates a private link (`POST /v1/admin/consent-forms`, optional pre-fill and
+expiry). The site opens it at `#/consent/<token>`. Public endpoints, keyed only by the token:
+`GET /v1/consent/{token}` · `PATCH /v1/consent/{token}` (autosave, changed fields only, merged atomically) ·
+`POST /v1/consent/{token}/submit` (checks required fields, locks the form) · `POST /v1/consent/{token}/email`
+(multipart `pdf`, emails the signed copy to `CONSENT_EMAIL` and the client, once).
+Admin: `GET /v1/admin/consent-forms` (`state`, `q`) · `GET /v1/admin/consent-forms/{id}` ·
+`POST /v1/admin/consent-forms/{id}/revoke` · `GET /v1/admin/contact-messages`.
+A revoked or expired link returns 410 everywhere; answers stay in the database. **Consent forms store health
+information** (presenting complaint) and anyone holding a link can read it until it expires or is closed, so prefer
+short expiries and close links once signed.
+
 ## Admin panel
 Open the site at `#/admin` (e.g. `http://localhost:5173/#/admin`) and enter `ADMIN_API_KEY`. The key is kept in
 sessionStorage only. Pages: overview, customers (search, sort, CSV export), a full customer profile (contact details,

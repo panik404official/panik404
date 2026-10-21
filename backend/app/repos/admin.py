@@ -12,7 +12,7 @@ from uuid import UUID
 from tortoise import connections
 from tortoise.expressions import Q
 
-from ..models import Customer, Event, Lead, Order, Payment, Product, Session, Visitor
+from ..models import ContactMessage, Customer, Event, Lead, Order, Payment, Product, Session, Visitor
 
 CUSTOMER_SORTS = {
     "recent": "c.created_at DESC",
@@ -230,6 +230,21 @@ async def list_leads(q: str | None, before: datetime | None, limit: int) -> list
     if q and q.strip():
         t = q.strip()
         qs = qs.filter(Q(email__icontains=t) | Q(name__icontains=t) | Q(message__icontains=t))
+    rows = await qs.order_by("-created_at").limit(limit).values()
+    emails = list({r["email"] for r in rows})
+    ids = dict(await Customer.filter(email__in=emails).values_list("email", "id")) if emails else {}
+    for r in rows:
+        r["customer_id"] = ids.get(r["email"])
+    return rows
+
+
+async def list_contact_messages(q: str | None, before: datetime | None, limit: int) -> list[dict]:
+    qs = ContactMessage.all()
+    if before:
+        qs = qs.filter(created_at__lt=before)
+    if q and q.strip():
+        t = q.strip()
+        qs = qs.filter(Q(email__icontains=t) | Q(name__icontains=t) | Q(message__icontains=t) | Q(topic__icontains=t))
     rows = await qs.order_by("-created_at").limit(limit).values()
     emails = list({r["email"] for r in rows})
     ids = dict(await Customer.filter(email__in=emails).values_list("email", "id")) if emails else {}

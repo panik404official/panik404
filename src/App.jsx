@@ -11,10 +11,14 @@ import Why from './pages/Why';
 import Gift from './pages/Gift';
 import Book from './pages/Book';
 import Corporate from './pages/Corporate';
+import Terms from './pages/Terms';
+import Contact from './pages/Contact';
 import { track, trackPageView } from './utils/tracker';
 
 // Loaded only when someone opens #/admin, so shoppers never download the admin code.
 const AdminApp = lazy(() => import('./admin/AdminApp'));
+// Consent forms open from a private link; loaded on demand (it pulls in the PDF library).
+const ConsentPage = lazy(() => import('./consent/ConsentPage'));
 
 function ShopRoute({ add }) {
   const { sort } = useParams();
@@ -30,9 +34,11 @@ export default function App() {
   const [cart, setCart] = useState([]);
   const { pathname } = useLocation();
   const isAdmin = pathname === '/admin' || pathname.startsWith('/admin/');
+  const isConsent = pathname.startsWith('/consent/');
   useEffect(() => {
-    if (!isAdmin) trackPageView(pathname); // admin browsing must not pollute customer analytics
-  }, [pathname, isAdmin]);
+    // Admin browsing must not pollute customer analytics, and consent links carry a private token.
+    if (!isAdmin && !isConsent) trackPageView(pathname);
+  }, [pathname, isAdmin, isConsent]);
   const add = (x) => {
     track('add_to_cart', { product_id: x.id });
     setCart((c) =>
@@ -47,6 +53,15 @@ export default function App() {
     return (
       <Suspense fallback={<p style={{ padding: 24 }}>Loading admin…</p>}>
         <AdminApp />
+      </Suspense>
+    );
+
+  if (isConsent)
+    return (
+      <Suspense fallback={<p style={{ padding: 24 }}>Opening your form…</p>}>
+        <Routes>
+          <Route path="/consent/:token" element={<ConsentPage />} />
+        </Routes>
       </Suspense>
     );
 
@@ -65,6 +80,8 @@ export default function App() {
           <Route path="/book-a-session" element={<Book />} />
           <Route path="/cart" element={<Cart cart={cart} setCart={setCart} />} />
           <Route path="/corporate" element={<Corporate />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/contact" element={<Contact />} />
           <Route path="*" element={<Home />} />
         </Routes>
       </main>

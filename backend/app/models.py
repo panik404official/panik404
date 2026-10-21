@@ -155,3 +155,47 @@ class Lead(Model):
 
     class Meta:
         table = "leads"
+
+
+class ContactMessage(Model):
+    """A message sent from the Contact us page (emailed to the team, kept here for the admin panel)."""
+
+    id = fields.UUIDField(primary_key=True)
+    visitor = fields.ForeignKeyField("models.Visitor", related_name="contact_messages", null=True,
+                                     on_delete=fields.SET_NULL)
+    name = fields.CharField(max_length=120)
+    email = fields.CharField(max_length=320)
+    phone = fields.CharField(max_length=32, null=True)
+    topic = fields.CharField(max_length=40)
+    message = fields.TextField()
+    created_at = fields.DatetimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        table = "contact_messages"
+
+
+class ConsentForm(Model):
+    """An informed-consent form opened through a private link that an admin generates.
+
+    Everything typed into the form (including drawn signatures) is autosaved into `data`, so whoever opens
+    the same link next sees the fields already filled. A revoked or expired link no longer opens.
+    status: open -> completed (signed), or revoked by an admin at any time.
+    """
+
+    id = fields.UUIDField(primary_key=True)
+    token = fields.CharField(max_length=64, unique=True)
+    status = fields.CharField(max_length=16, default="open", db_index=True)
+    note = fields.CharField(max_length=200, null=True)  # admin-only label, e.g. "Sara, 2 Nov session"
+    data = fields.JSONField(default=dict)
+    reference = fields.CharField(max_length=32, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True, db_index=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+    expires_at = fields.DatetimeField(null=True)
+    first_opened_at = fields.DatetimeField(null=True)
+    last_opened_at = fields.DatetimeField(null=True)
+    completed_at = fields.DatetimeField(null=True)
+    revoked_at = fields.DatetimeField(null=True)
+    emailed_at = fields.DatetimeField(null=True)
+
+    class Meta:
+        table = "consent_forms"

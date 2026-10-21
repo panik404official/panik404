@@ -12,6 +12,9 @@ import VisitorJourney from './pages/VisitorJourney';
 import Activity from './pages/Activity';
 import Leads from './pages/Leads';
 import Catalogue from './pages/Catalogue';
+import ConsentForms from './pages/ConsentForms';
+import ConsentDetail from './pages/ConsentDetail';
+import ContactMessages from './pages/ContactMessages';
 import './admin.css';
 
 const NAV = [
@@ -20,6 +23,8 @@ const NAV = [
   ['/admin/orders', 'Orders'],
   ['/admin/visitors', 'Visitors'],
   ['/admin/activity', 'Live activity'],
+  ['/admin/consent', 'Consent forms'],
+  ['/admin/messages', 'Contact messages'],
   ['/admin/leads', 'Corporate leads'],
   ['/admin/catalogue', 'Products & payments'],
 ];
@@ -101,6 +106,9 @@ export default function AdminApp() {
             <Route path="/admin/activity" element={<Activity />} />
             <Route path="/admin/leads" element={<Leads />} />
             <Route path="/admin/catalogue" element={<Catalogue />} />
+            <Route path="/admin/consent" element={<ConsentForms />} />
+            <Route path="/admin/consent/:id" element={<ConsentDetail />} />
+            <Route path="/admin/messages" element={<ContactMessages />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Routes>
         </main>

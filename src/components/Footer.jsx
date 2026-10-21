@@ -11,6 +11,10 @@ export default function Footer() {
         <Link to="/gift-a-session">Gift a session</Link>
         <Link to="/corporate">Corporate</Link>
         <Link to="/book-a-session">Book a session</Link>
+        <Link to="/contact">Contact us</Link>
+      </p>
+      <p className="footer-legal">
+        <Link to="/terms">Terms &amp; conditions</Link>
       </p>
       <small>Panik is not an emergency service. © Panik</small>
     </footer>

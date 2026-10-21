@@ -173,6 +173,77 @@ class BookingRequestIn(Strict):
     coupon: str | None = Field(None, max_length=100)
 
 
+# ---- contact us ------------------------------------------------------------------------------------
+ContactTopic = Literal["General question", "Booking", "Cancel, reschedule or refund", "Corporate wellness",
+                       "Gift a session", "Other"]
+
+
+class ContactIn(Strict):
+    visitor_id: UUID | None = None
+    session_id: UUID | None = None
+    context: TrackContext | None = None
+    name: str = Field(min_length=1, max_length=120)
+    email: EmailStr
+    phone: str | None = Field(None, max_length=32)
+    topic: ContactTopic = "General question"
+    message: str = Field(min_length=1, max_length=4000)
+
+    _email = field_validator("email")(_lower)
+
+
+# ---- consent forms ---------------------------------------------------------------------------------
+SIG_PREFIX = "data:image/png;base64,"
+SIG_MAX_CHARS = 300_000  # a 600x200 PNG of a signature is usually 5-40 KB
+
+
+def _sig(v):
+    if v in (None, ""):
+        return v
+    if not isinstance(v, str) or not v.startswith(SIG_PREFIX) or len(v) > SIG_MAX_CHARS:
+        raise ValueError("signature must be a PNG data URL under 300 KB")
+    return v
+
+
+Text = Annotated[str, Field(max_length=200)]
+
+
+class ConsentData(Strict):
+    """Every field of the consent form. All optional so the page can autosave one field at a time."""
+
+    name: Text | None = None
+    dob: str | None = Field(None, max_length=10)
+    phone: str | None = Field(None, max_length=32)
+    email: str | None = Field(None, max_length=320)
+    ename: Text | None = None
+    ephone: str | None = Field(None, max_length=32)
+    date: str | None = Field(None, max_length=10)
+    session_time: str | None = Field(None, max_length=25)
+    complaint: str | None = Field(None, max_length=4000)
+    ack: bool | None = None
+    pname: Text | None = None
+    pqual: Text | None = None
+    pcnic: str | None = Field(None, max_length=20)
+    gneed: bool | None = None
+    gname: Text | None = None
+    grel: Text | None = None
+    gift: bool | None = None
+    rname: Text | None = None
+    rrel: Text | None = None
+    rcontact: Text | None = None
+    rcode: str | None = Field(None, max_length=100)
+    sig_client: str | None = None
+    sig_psych: str | None = None
+    sig_guardian: str | None = None
+
+    _sigs = field_validator("sig_client", "sig_psych", "sig_guardian")(_sig)
+
+
+class ConsentCreate(Strict):
+    note: str | None = Field(None, max_length=200)
+    expires_in_days: int | None = Field(7, ge=1, le=365, description="null = never expires")
+    prefill: ConsentData = Field(default_factory=ConsentData)
+
+
 class StatusUpdate(Strict):
     status: OrderStatus
     provider: str | None = Field(None, max_length=50)

@@ -198,3 +198,31 @@
   .adm-list li > span, .adm-list li > small { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .adm-side { transition: none; } }
+
+/* consent forms + contact messages */
+.adm-status.c-open { background: #fef3c7; color: #92400e; }
+.adm-status.c-completed { background: #dcfce7; color: #166534; }
+.adm-status.c-expired { background: #f1f1f4; color: #52525b; }
+.adm-status.c-revoked { background: #fee2e2; color: #991b1b; }
+.adm h1 .adm-status { vertical-align: middle; font-family: Nunito, sans-serif; margin-left: 8px; }
+.adm-btn.danger { color: #991b1b; border-color: #f5c2c2; }
+.adm-btn.danger:hover:not(:disabled) { border-color: #991b1b; }
+.adm-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.adm-form .adm-sub { margin-bottom: 14px; }
+.adm-form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px 16px; }
+.adm-form-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; font-weight: 700; color: var(--a-mute); }
+.adm-form-grid label.wide { grid-column: 1 / -1; }
+.adm .adm-form-grid input, .adm .adm-form-grid select, .adm-linkbox input {
+  width: 100%; font: inherit; font-weight: 400; color: var(--a-ink); background: #fff; border: 1px solid #d9ccf5; border-radius: 6px; padding: 7px 10px;
+}
+.adm-created { border-color: #c4b5fd; background: #fcfaff; }
+.adm-linkbox { display: flex; gap: 8px; margin: 6px 0 4px; }
+.adm-linkbox input { flex: 1; min-width: 0; font-family: ui-monospace, Menlo, monospace; font-size: 0.82rem; }
+.adm-seg { display: inline-flex; background: #fff; border: 1px solid #d9ccf5; border-radius: 8px; padding: 3px; gap: 2px; }
+.adm-seg button { font: inherit; font-weight: 700; font-size: 0.85rem; border: 0; background: none; color: var(--a-mute); padding: 5px 12px; border-radius: 6px; cursor: pointer; }
+.adm-seg button.on { background: var(--a-ink); color: #fff; }
+.adm-sigs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.adm-sigimg { margin: 0; }
+.adm-sigimg figcaption { font-size: 0.8rem; color: var(--a-mute); margin-bottom: 4px; }
+.adm-sigimg img { display: block; width: 100%; aspect-ratio: 3 / 1; object-fit: contain; border: 1px dashed #c4b5fd; border-radius: 8px; background: #fff; }
+.adm-sigimg span { display: grid; place-items: center; aspect-ratio: 3 / 1; border: 1px dashed var(--a-line); border-radius: 8px; }
