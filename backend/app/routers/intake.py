@@ -14,7 +14,7 @@ from pydantic import BaseModel, ValidationError
 
 from ..config import Settings
 from ..mailer import Attachment, Mail, MailNotConfigured, send_mail
-from ..models import Order
+from ..models import Order, PartnerVerification
 from ..schemas import BookingRequestIn, GiftRequestIn
 from ..security import limit
 from ..voucher import make_gift_voucher_pdf
@@ -157,19 +157,30 @@ async def booking_request(request: Request, data: str = Form(...), receipt: Uplo
     order = await _pending_order(body.order_id, "booking")
 
     c, d = order.customer, order.details
+    attachments = [proof]
+    partner_rows = []
+    if d.get("partner_verification_id"):
+        v = await PartnerVerification.get_or_none(id=d["partner_verification_id"])
+        partner_rows = [("Partner programme", f"{d.get('partner_name')} ({d.get('discount_pct')}% off)"),
+                        ("Employee ID", d.get("employee_id")),
+                        ("ID check", f"{v.status} (document attached)" if v else "record missing")]
+        if v:
+            attachments.append(Attachment(f"id-{v.file_name}", bytes(v.file_data), v.file_mime))
     rows = [
         ("Name", c.name), ("Email", c.email), ("Phone", c.phone), ("Age", body.age), ("Role", body.role),
         ("Concerns", ", ".join(body.concern)), ("Description", body.desc), ("Duration", body.duration),
         ("Distress (0-10)", body.distress), ("Immediate danger", body.danger),
         ("Suicidal thoughts", body.suicidal), ("Self-harm", body.harm), ("Medical emergency", body.medical),
         ("Current treatment", body.treatment), ("Preferred date", d.get("preferred_date")),
-        ("Preferred time", d.get("preferred_time")), ("Notes", body.notes), ("Coupon", body.coupon),
-        ("Total", _rs(order.total)),
+        ("Preferred time", d.get("preferred_time")), ("Notes", body.notes),
+        *([] if partner_rows else [("Coupon", body.coupon)]), *partner_rows,
+        ("Subtotal", _rs(order.subtotal)), ("Discount", _rs(order.discount)), ("Total", _rs(order.total)),
     ]
+    tag = f"{d['partner_name']} booking" if d.get("partner_name") else "Booking"
     admin = Mail(
         to=s.admin_email,
         reply_to=c.email,
-        subject=f"Booking #{order.order_no} from {c.name}: payment receipt attached",
+        subject=f"{tag} #{order.order_no} from {c.name}: payment receipt attached",
         text="\n".join([
             f"Booking request #{order.order_no} was submitted with a payment receipt.", "",
             *[f"{label}: {value if value not in (None, '') else '(none)'}" for label, value in rows],
@@ -177,7 +188,7 @@ async def booking_request(request: Request, data: str = Form(...), receipt: Uplo
             "Payment status: Not verified (receipt attached)",
             "Consent: Yes",
         ]),
-        attachments=[proof],
+        attachments=attachments,
     )
     customer = Mail(
         to=c.email,
@@ -192,5 +203,5 @@ async def booking_request(request: Request, data: str = Form(...), receipt: Uplo
         ]),
     )
     await _send(s, "booking", admin, customer)
-    await _mark_submitted(order, proof, body.coupon)
+    await _mark_submitted(order, proof, None if d.get("partner") else body.coupon)
     return {"message": "Booking request sent.", "order_no": order.order_no}

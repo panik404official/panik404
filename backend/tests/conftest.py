@@ -58,6 +58,12 @@ def ids():
     return {"visitor_id": str(uuid.uuid4()), "session_id": str(uuid.uuid4())}
 
 
+def future_date(days: int = 5) -> str:
+    """A booking date safely past the 48-hour minimum notice."""
+    from datetime import date, timedelta
+    return (date.today() + timedelta(days=days)).isoformat()
+
+
 def wait_for(sql, *params, want=1, timeout=5.0):
     """Poll until the async writer has flushed."""
     end = time.time() + timeout

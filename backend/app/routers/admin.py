@@ -2,10 +2,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
-from ..repos import admin as admin_repo, analytics, consent as consent_repo, orders as orders_repo
-from ..schemas import ConsentCreate, OrderOut, StatusUpdate
+from ..repos import admin as admin_repo, analytics, consent as consent_repo, orders as orders_repo, partners as partners_repo
+from ..schemas import ConsentCreate, OrderOut, PartnerReview, StatusUpdate
 from ..security import require_admin
 
 router = APIRouter(prefix="/v1/admin", tags=["admin"], dependencies=[Depends(require_admin)])
@@ -160,3 +160,42 @@ async def revoke_consent_form(form_id: UUID):
         return consent_repo.admin_row(await consent_repo.revoke(form_id), full=True)
     except consent_repo.ConsentError as e:
         raise HTTPException(e.status_code, e.message) from e
+
+
+# ---- partner programmes (e.g. Ibex) --------------------------------------------------------------------
+@router.get("/partner-verifications")
+async def list_partner_verifications(
+    partner: str | None = Query(None, max_length=32),
+    status: Literal["pending", "approved", "rejected"] | None = None,
+    booked: bool | None = None,
+    q: str | None = Query(None, max_length=200),
+    limit: int = Query(100, ge=1, le=500),
+):
+    return {"items": await partners_repo.list_verifications(partner, status, booked, q, limit),
+            **await partners_repo.counts()}
+
+
+@router.get("/partner-verifications/{vid}")
+async def partner_verification_detail(vid: UUID):
+    data = await partners_repo.detail(vid)
+    if data is None:
+        raise HTTPException(404, "Verification not found")
+    return data
+
+
+@router.get("/partner-verifications/{vid}/file")
+async def partner_verification_file(vid: UUID):
+    v = await partners_repo.file(vid)
+    if v is None:
+        raise HTTPException(404, "Verification not found")
+    return Response(bytes(v.file_data), media_type=v.file_mime, headers={
+        "Content-Disposition": f'inline; filename="{v.file_name}"', "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "private, no-store"})
+
+
+@router.patch("/partner-verifications/{vid}")
+async def review_partner_verification(vid: UUID, body: PartnerReview):
+    data = await partners_repo.review(vid, body.status, body.admin_note, "admin_note" in body.model_fields_set)
+    if data is None:
+        raise HTTPException(404, "Verification not found")
+    return data

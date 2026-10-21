@@ -107,6 +107,17 @@ class BookingOrder(OrderBase):
     kind: Literal["booking"]
     preferred_date: date | None = None
     preferred_time: str | None = Field(None, max_length=20)
+    # The same moment as date + time, with the visitor's UTC offset, so the 48-hour rule uses their clock.
+    preferred_at: datetime | None = None
+    # Set when booking through a partner programme (e.g. #/gift-a-session/ibex): the server applies its discount.
+    partner_verification_id: UUID | None = None
+
+    @field_validator("preferred_at")
+    @classmethod
+    def _aware(cls, v):
+        if v is not None and v.tzinfo is None:
+            raise ValueError("preferred_at must include a UTC offset")
+        return v
 
 
 OrderIn = Annotated[Union[ProductOrder, GiftOrder, BookingOrder], Field(discriminator="kind")]
@@ -242,6 +253,21 @@ class ConsentCreate(Strict):
     note: str | None = Field(None, max_length=200)
     expires_in_days: int | None = Field(7, ge=1, le=365, description="null = never expires")
     prefill: ConsentData = Field(default_factory=ConsentData)
+
+
+# ---- partner programmes ----------------------------------------------------------------------------
+class PartnerVerifyIn(Strict):
+    """Sent as the JSON "data" field next to the ID document file."""
+
+    visitor_id: UUID | None = None
+    session_id: UUID | None = None
+    context: TrackContext | None = None
+    employee_id: str = Field(min_length=1, max_length=64)
+
+
+class PartnerReview(Strict):
+    status: Literal["pending", "approved", "rejected"] | None = None
+    admin_note: str | None = Field(None, max_length=500)
 
 
 class StatusUpdate(Strict):

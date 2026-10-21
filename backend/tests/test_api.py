@@ -2,7 +2,7 @@ import time
 import uuid
 from decimal import Decimal
 
-from .conftest import ADMIN, q, wait_for
+from .conftest import future_date, ADMIN, q, wait_for
 
 CUSTOMER = {"name": "Sara Khan", "email": "Sara@Example.com", "phone": "+92300111222"}
 
@@ -101,7 +101,7 @@ def test_gift_bundle_discount_matches_storefront(client, ids):
 
 def test_booking_rejects_clinical_fields(client, ids):
     ok = client.post("/v1/orders", json={**ids, "kind": "booking", "customer": CUSTOMER,
-                                         "preferred_date": "2026-11-02", "preferred_time": "4:30 PM"})
+                                         "preferred_date": future_date(), "preferred_time": "4:30 PM"})
     assert ok.status_code == 201 and Decimal(ok.json()["total"]) == 9995
     leak = client.post("/v1/orders", json={**ids, "kind": "booking", "customer": CUSTOMER, "suicidal": "Yes"})
     assert leak.status_code == 422

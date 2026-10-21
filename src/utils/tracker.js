@@ -123,5 +123,20 @@ export const sendBookingRequest = (orderId, fields, receipt) =>
 export const createOrder = (payload, idempotencyKey = crypto.randomUUID()) =>
   post('/v1/orders', payload, { 'Idempotency-Key': idempotencyKey });
 export const createLead = (payload) => post('/v1/leads', payload);
+/** Partner programme name and discount, from the server. */
+export async function getPartner(slug) {
+  const res = await fetch(`${API}/v1/partners/${encodeURIComponent(slug)}`);
+  if (!res.ok) throw new Error(errorText((await res.json().catch(() => ({}))).detail, res.status));
+  return res.json();
+}
+/** Saves a partner employee's details and ID document. Resolves with { id, discount_pct, ... }. */
+export async function sendPartnerVerification(slug, fields, document) {
+  const form = new FormData();
+  form.append('data', JSON.stringify({ ...ids(), context: context(), ...fields }));
+  form.append('document', document);
+  const res = await fetch(`${API}/v1/partners/${encodeURIComponent(slug)}/verify`, { method: 'POST', body: form });
+  if (!res.ok) throw new Error(errorText((await res.json().catch(() => ({}))).detail, res.status));
+  return res.json();
+}
 /** Contact us: emails the team and sends the visitor a copy. */
 export const sendContact = (payload) => post('/v1/contact', payload);

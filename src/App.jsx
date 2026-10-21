@@ -13,6 +13,7 @@ import Book from './pages/Book';
 import Corporate from './pages/Corporate';
 import Terms from './pages/Terms';
 import Contact from './pages/Contact';
+import PartnerBooking from './pages/PartnerBooking';
 import { track, trackPageView } from './utils/tracker';
 
 // Loaded only when someone opens #/admin, so shoppers never download the admin code.
@@ -77,6 +78,7 @@ export default function App() {
           <Route path="/shop/:sort" element={<ShopRoute add={add} />} />
           <Route path="/why-us" element={<Why />} />
           <Route path="/gift-a-session" element={<Gift />} />
+          <Route path="/gift-a-session/:partner" element={<PartnerBooking />} />
           <Route path="/book-a-session" element={<Book />} />
           <Route path="/cart" element={<Cart cart={cart} setCart={setCart} />} />
           <Route path="/corporate" element={<Corporate />} />

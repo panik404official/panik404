@@ -199,3 +199,32 @@ class ConsentForm(Model):
 
     class Meta:
         table = "consent_forms"
+
+
+class PartnerVerification(Model):
+    """A partner employee's details and ID document, uploaded before the discounted booking form opens.
+
+    status: pending (waiting for the team to check the ID) -> approved | rejected.
+    `order` is set once the discounted booking is placed; each verification books one session.
+    """
+
+    id = fields.UUIDField(primary_key=True)
+    partner = fields.CharField(max_length=32, db_index=True)
+    status = fields.CharField(max_length=16, default="pending", db_index=True)
+    visitor = fields.ForeignKeyField("models.Visitor", related_name="partner_verifications", null=True,
+                                     on_delete=fields.SET_NULL)
+    employee_id = fields.CharField(max_length=64)
+    file_name = fields.CharField(max_length=120)
+    file_mime = fields.CharField(max_length=64)
+    file_size = fields.IntField()
+    file_data = fields.BinaryField()
+    order = fields.OneToOneField("models.Order", related_name="partner_verification", null=True,
+                                 on_delete=fields.SET_NULL)
+    used_at = fields.DatetimeField(null=True)
+    admin_note = fields.CharField(max_length=500, null=True)
+    reviewed_at = fields.DatetimeField(null=True)
+    created_at = fields.DatetimeField(auto_now_add=True, db_index=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "partner_verifications"

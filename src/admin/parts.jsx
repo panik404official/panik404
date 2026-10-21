@@ -9,12 +9,17 @@ const DETAIL_LABELS = {
   delivery: 'Delivery',
   address: 'Postal address',
   message: 'Gift message',
-  discount_pct: 'Bundle discount %',
+  discount_pct: 'Discount %',
   preferred_date: 'Preferred date',
   preferred_time: 'Preferred time',
   mode: 'Mode',
   request_submitted_at: 'Receipt submitted',
   coupon: 'Coupon',
+  preferred_at: 'Preferred start (with time zone)',
+  partner: 'Partner',
+  partner_name: 'Partner programme',
+  employee_id: 'Employee ID',
+  partner_verification_id: 'Partner verification',
 };
 
 export function OrderDetails({ details }) {
@@ -24,7 +29,15 @@ export function OrderDetails({ details }) {
     <dl className="adm-fields">
       {entries.map(([k, v]) => (
         <Field key={k} label={DETAIL_LABELS[k] || k}>
-          {k.endsWith('_at') ? when(v) : typeof v === 'object' ? JSON.stringify(v) : String(v)}
+          {k === 'partner_verification_id' ? (
+            <Link to={`/admin/partners/${v}`}>View ID check</Link>
+          ) : k.endsWith('_at') && k !== 'preferred_at' ? (
+            when(v)
+          ) : typeof v === 'object' ? (
+            JSON.stringify(v)
+          ) : (
+            String(v)
+          )}
         </Field>
       ))}
     </dl>

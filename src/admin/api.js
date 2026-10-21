@@ -48,3 +48,12 @@ export async function api(path, { params, method = 'GET', body, key = getKey() }
   if (!res.ok) throw new Error(message((await res.json().catch(() => ({}))).detail, res.status));
   return res.json();
 }
+
+/** Fetches a protected file (needs the admin key header) and returns an object URL for <img>/<iframe>. */
+export async function apiFileUrl(path) {
+  const res = await fetch(`${API}/v1/admin${path}`, { headers: { 'X-Admin-Key': getKey() } });
+  if (res.status === 401) throw new AuthError('That admin key was not accepted.');
+  if (!res.ok) throw new Error(`Could not load the file (HTTP ${res.status}).`);
+  const blob = await res.blob();
+  return { url: URL.createObjectURL(blob), type: blob.type };
+}

@@ -13,19 +13,39 @@ export function checkReceipt(file) {
   return '';
 }
 
-export function PaymentInstructions({ amount, purpose, confirmation, coupon, onCoupon, idPrefix }) {
+export function PaymentInstructions({
+  amount,
+  regularAmount,
+  purpose,
+  confirmation,
+  coupon,
+  onCoupon,
+  idPrefix,
+  showCoupon = true,
+}) {
   return (
     <>
-      <label htmlFor={`${idPrefix}-coupon`}>Coupon Code/Employee ID</label>
-      <input
-        id={`${idPrefix}-coupon`}
-        maxLength={100}
-        value={coupon || ''}
-        onChange={(e) => onCoupon(e.target.value)}
-      />
+      {showCoupon && (
+        <>
+          <label htmlFor={`${idPrefix}-coupon`}>Coupon Code/Employee ID</label>
+          <input
+            id={`${idPrefix}-coupon`}
+            maxLength={100}
+            value={coupon || ''}
+            onChange={(e) => onCoupon(e.target.value)}
+          />
+        </>
+      )}
       <h3 style={{ fontSize: '1.2rem' }}>Payment Instructions</h3>
       <p>
-        Please transfer <b>{fmt(amount)}</b> for {purpose} to:
+        Please transfer <b>{fmt(amount)}</b>
+        {regularAmount && regularAmount !== amount && (
+          <>
+            {' '}
+            <s>{fmt(regularAmount)}</s>
+          </>
+        )}{' '}
+        for {purpose} to:
       </p>
       <p>
         Account Name: PANIK

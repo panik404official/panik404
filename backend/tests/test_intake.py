@@ -5,7 +5,7 @@ import pytest
 
 from app.routers import intake
 
-from .conftest import q
+from .conftest import future_date, q
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 BOOKING_FIELDS = {
@@ -69,7 +69,7 @@ def test_posted_gift_only_emails_team(client, ids, sent):
 
 
 def test_booking_request_emails_but_never_stores_screening_answers(client, ids, sent):
-    o = order(client, ids, kind="booking", preferred_date="2026-11-02", preferred_time="4:05 PM")
+    o = order(client, ids, kind="booking", preferred_date=future_date(), preferred_time="4:05 PM")
     r = submit(client, "/v1/bookings/request", {"order_id": o["id"], **BOOKING_FIELDS},
                receipt=("scan.pdf", b"%PDF-1.4 test", "application/pdf"))
     assert r.status_code == 200, r.text

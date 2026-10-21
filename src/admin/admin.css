@@ -226,3 +226,11 @@
 .adm-sigimg figcaption { font-size: 0.8rem; color: var(--a-mute); margin-bottom: 4px; }
 .adm-sigimg img { display: block; width: 100%; aspect-ratio: 3 / 1; object-fit: contain; border: 1px dashed #c4b5fd; border-radius: 8px; background: #fff; }
 .adm-sigimg span { display: grid; place-items: center; aspect-ratio: 3 / 1; border: 1px dashed var(--a-line); border-radius: 8px; }
+
+/* partner bookings */
+.adm-status.v-pending { background: #fef3c7; color: #92400e; }
+.adm-status.v-approved { background: #dcfce7; color: #166534; }
+.adm-status.v-rejected { background: #fee2e2; color: #991b1b; }
+.adm-doc { display: block; width: 100%; max-height: 70vh; object-fit: contain; border: 1px solid var(--a-line); border-radius: 8px; background: #fcfbff; }
+iframe.adm-doc { height: 70vh; }
+.adm-textarea { width: 100%; font: inherit; color: var(--a-ink); border: 1px solid #d9ccf5; border-radius: 6px; padding: 8px 10px; resize: vertical; }

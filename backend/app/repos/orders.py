@@ -1,15 +1,21 @@
-from datetime import datetime, timezone
+import re
+from datetime import datetime, time, timezone
+from zoneinfo import ZoneInfo
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from tortoise.exceptions import IntegrityError
 from tortoise.transactions import in_transaction
 
-from ..models import Customer, Event, Lead, Order, OrderItem, Payment, Product, Visitor
+from ..models import Customer, Event, Lead, Order, OrderItem, Payment, PartnerVerification, Product, Visitor
+from ..partners import BOOKING_NOTICE_GRACE, MIN_BOOKING_NOTICE, PARTNERS, VERIFICATION_MAX_AGE
 from ..schemas import BookingOrder, CustomerIn, GiftOrder, LeadIn, ProductOrder
 from .tracking import Ctx, ensure_visitor_session
 
 CENT = Decimal("0.01")
+RUPEE = Decimal("1")
+PKT = ZoneInfo("Asia/Karachi")
+TIME_RE = re.compile(r"^\s*(\d{1,2}):(\d{2})\s*([AaPp][Mm])\s*$")
 GIFT_PRODUCT = "gift-session"
 BOOKING_PRODUCT = "booking-consultation"
 
@@ -56,10 +62,61 @@ async def _price(body) -> tuple[list[dict], Decimal, Decimal, dict[str, Any]]:
     prod = (await _products([BOOKING_PRODUCT], "booking")).get(BOOKING_PRODUCT)
     if not prod:
         raise OrderError(503, "Bookings are currently unavailable")
+    _check_notice(body)
     details = {"preferred_date": body.preferred_date.isoformat() if body.preferred_date else None,
                "preferred_time": body.preferred_time, "mode": "online"}
+    if body.preferred_at:
+        details["preferred_at"] = body.preferred_at.isoformat()
+    discount = Decimal(0)
+    if body.partner_verification_id:
+        v = await _usable_verification(body.partner_verification_id)
+        partner = PARTNERS[v.partner]
+        discount = (prod["unit_price"] * partner.discount_pct / 100).quantize(RUPEE, ROUND_HALF_UP)
+        details.update(partner=partner.slug, partner_name=partner.name, discount_pct=partner.discount_pct,
+                       partner_verification_id=str(v.id), employee_id=v.employee_id)
     line = {"product_id": BOOKING_PRODUCT, "name": prod["name"], "unit_price": prod["unit_price"], "quantity": 1}
-    return [line], prod["unit_price"], Decimal(0), details
+    return [line], prod["unit_price"], discount, details
+
+
+def _parse_time(value: str | None) -> time | None:
+    m = TIME_RE.match(value or "")
+    if not m:
+        return None
+    h, mi, ap = int(m[1]), int(m[2]), m[3].upper()
+    if not (1 <= h <= 12 and 0 <= mi <= 59):
+        return None
+    return time(h % 12 + (12 if ap == "PM" else 0), mi)
+
+
+def _check_notice(body: BookingOrder) -> None:
+    """Sessions must be requested at least 48 hours ahead. Uses the visitor's own offset when the browser sends
+    preferred_at; otherwise the date and time are read as Pakistan time."""
+    when = body.preferred_at
+    if when is None and body.preferred_date:
+        t = _parse_time(body.preferred_time)
+        if body.preferred_time and t is None:
+            raise OrderError(422, "Preferred time must look like 4:30 PM.")
+        when = datetime.combine(body.preferred_date, t or time(23, 59), tzinfo=PKT)
+    if when is None:
+        return
+    earliest = datetime.now(timezone.utc) + MIN_BOOKING_NOTICE
+    if when < earliest - BOOKING_NOTICE_GRACE:
+        local = earliest.astimezone(when.tzinfo or PKT)
+        raise OrderError(422, "Sessions must be booked at least 48 hours ahead. Choose "
+                              f"{local.strftime('%a %d %b, %I:%M %p').replace(' 0', ' ')} or later.")
+
+
+async def _usable_verification(vid) -> PartnerVerification:
+    v = await PartnerVerification.get_or_none(id=vid)
+    if v is None or v.partner not in PARTNERS:
+        raise OrderError(422, "Partner verification not found. Upload your details again.")
+    if v.status == "rejected":
+        raise OrderError(409, "This verification was not approved. Contact Panik for help.")
+    if v.order_id:
+        raise OrderError(409, "This verification was already used for a booking.")
+    if datetime.now(timezone.utc) - v.created_at > VERIFICATION_MAX_AGE:
+        raise OrderError(409, "This verification has expired. Upload your details again.")
+    return v
 
 
 async def _upsert_customer(c: CustomerIn) -> Customer:
@@ -95,6 +152,11 @@ async def create_order(body, ctx: Ctx, idem_key: str | None) -> tuple[Order, boo
                 OrderItem(order_id=order.id, line_no=i, product_id=l["product_id"], name=l["name"],
                           unit_price=l["unit_price"], quantity=l["quantity"])
                 for i, l in enumerate(lines, 1)])
+            if vid := details.get("partner_verification_id"):
+                claimed = await PartnerVerification.filter(id=vid, order_id__isnull=True).update(
+                    order_id=order.id, used_at=now)
+                if not claimed:  # another tab booked with it a moment ago
+                    raise OrderError(409, "This verification was already used for a booking.")
             await Event.create(occurred_at=now, visitor_id=body.visitor_id, session_id=body.session_id,
                                type="order_created", path="/checkout",
                                props={"order_id": str(order.id), "order_no": order_no, "kind": body.kind,

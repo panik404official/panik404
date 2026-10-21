@@ -69,6 +69,19 @@ A revoked or expired link returns 410 everywhere; answers stay in the database. 
 information** (presenting complaint) and anyone holding a link can read it until it expires or is closed, so prefer
 short expiries and close links once signed.
 
+## Partner programmes (Ibex) and the 48-hour rule
+`#/gift-a-session/ibex`: the employee first uploads name, email, phone, employee ID and an ID card image/PDF
+(`POST /v1/partners/ibex/verify`, multipart `data` + `document`; stored in `partner_verifications`, file included).
+The 6-page booking form then opens without the coupon field. The order sends `partner_verification_id`; the server
+checks it (same email, not rejected, not used, under 7 days old) and applies the partner discount (Ibex 25%:
+Rs 9,995 - 2,499 = Rs 7,496). Each verification books one session. The booking email to the team carries the
+partner details and attaches the ID document. Partners are configured in `app/partners.py`.
+Admin: `GET /v1/admin/partner-verifications` (`status`, `booked`, `q`) · `GET .../{id}` · `GET .../{id}/file` ·
+`PATCH .../{id}` (`status`: pending | approved | rejected, `admin_note`). Panel page: "Partner bookings".
+
+All bookings must start at least 48 hours from now. The browser sends `preferred_at` (with its UTC offset) and the
+server rejects anything earlier (10-minute clock allowance); without `preferred_at`, date + time are read as Pakistan time.
+
 ## Admin panel
 Open the site at `#/admin` (e.g. `http://localhost:5173/#/admin`) and enter `ADMIN_API_KEY`. The key is kept in
 sessionStorage only. Pages: overview, customers (search, sort, CSV export), a full customer profile (contact details,

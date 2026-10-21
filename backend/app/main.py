@@ -13,7 +13,7 @@ from tortoise.exceptions import DBConnectionError, OperationalError
 from .config import get_settings
 from .db import tortoise_config
 from .ingest import IngestBuffer
-from .routers import admin, consent, contact, health, intake, orders, track
+from .routers import admin, consent, contact, health, intake, orders, partners, track
 from .security import RateLimiter
 
 log = logging.getLogger("app")
@@ -69,7 +69,8 @@ def create_app() -> FastAPI:
     async def limit_body(request: Request, call_next):
         cl = request.headers.get("content-length")
         path = request.url.path
-        if path in UPLOAD_PATHS or (path.startswith("/v1/consent/") and path.endswith("/email")):
+        if path in UPLOAD_PATHS or (path.startswith("/v1/consent/") and path.endswith("/email")) or (
+                path.startswith("/v1/partners/") and path.endswith("/verify")):
             cap = s.receipt_max_bytes + MAX_BODY_BYTES
         elif path.startswith("/v1/consent/"):
             cap = CONSENT_BODY_BYTES
@@ -89,7 +90,7 @@ def create_app() -> FastAPI:
                             headers={"Retry-After": "5"})
 
     for r in (health.router, track.router, orders.router, intake.router, contact.router, consent.router,
-              admin.router):
+              partners.router, admin.router):
         app.include_router(r)
     return app
 
