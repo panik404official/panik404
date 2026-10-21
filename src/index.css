@@ -419,8 +419,8 @@ summary {
   padding: 34px;
   border: 1px solid rgba(167, 139, 250, 0.2);
   border-radius: 20px;
-  background: #261e39;
-  color: #f3edff;
+  background: #d6cbf1;
+  color: #2e1065;
   font-size: 0.78rem;
   line-height: 1.45;
 }
@@ -430,7 +430,7 @@ summary {
 .gift-eyebrow,
 .gift-form label,
 .gift-preview-caption {
-  color: #bda4ff;
+  color: #4c1d95;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 0.68rem;
   letter-spacing: 0.04em;
@@ -446,7 +446,7 @@ summary {
 }
 .gift-builder-heading h2 {
   margin: 50px 0 0;
-  color: #a56af3;
+  color: #4c1d95;
   font-size: clamp(1.8rem, 4vw, 2.35rem);
 }
 .gift-builder-layout {
@@ -468,20 +468,20 @@ summary {
   display: block;
   width: 100%;
   padding: 9px 12px;
-  border: 1px solid #483968;
+  border: 1px solid #b8aad3;
   border-radius: 10px;
   outline: none;
-  background: #302449;
-  color: #f5efff;
+  background: #e6e3ee;
+  color: #2e1065;
   font: inherit;
   font-size: 0.78rem;
 }
 .gift-form input::placeholder {
-  color: #a99bbd;
+  color: #6b5a8e;
 }
 .gift-form input:focus,
 .gift-form textarea:focus {
-  border-color: #a879ef;
+  border-color: #6d28d9;
 }
 .gift-form textarea {
   min-height: 54px;
@@ -499,20 +499,20 @@ summary {
   grid-template-columns: 1fr 1fr 1fr;
   align-items: center;
   border-radius: 9px;
-  background: #1e172e;
+  background: #e6e3ee;
   text-align: center;
 }
 .gift-stepper button {
   height: 34px;
   border: 0;
   background: transparent;
-  color: #f3edff;
+  color: #2e1065;
   font: inherit;
   font-weight: 700;
   cursor: pointer;
 }
 .gift-stepper button:last-child {
-  color: #c4b5fd;
+  color: #2e1065;
 }
 .gift-stepper button:disabled {
   opacity: 0.55;
@@ -524,7 +524,7 @@ summary {
 .gift-price-pill {
   padding: 5px 10px;
   border-radius: 99px;
-  background: #c4b5fd;
+  background: #e6e3ee;
   color: #2e1065;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 0.63rem;
@@ -541,15 +541,17 @@ summary {
   padding: 5px 9px;
   border: 1px solid transparent;
   border-radius: 99px;
-  background: #1e172e;
-  color: #a99bbd;
+  background: #e6e3ee;
+  color: #2e1065;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 0.6rem;
   cursor: pointer;
 }
 .gift-tiers button.selected {
-  background: #f3effa;
-  color: #2b203d;
+  border-color: #6d28d9;
+  background: #f7f5fb;
+  color: #2e1065;
+  font-weight: 700;
 }
 .gift-delivery {
   display: grid;
@@ -557,48 +559,49 @@ summary {
   gap: 4px;
   padding: 4px;
   border-radius: 10px;
-  background: #1e172e;
+  background: #e6e3ee;
 }
 .gift-delivery button {
   min-height: 32px;
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: #bda4ff;
+  color: #2e1065;
   font: inherit;
   font-size: 0.76rem;
   font-weight: 700;
   cursor: pointer;
 }
 .gift-delivery button.selected {
-  background: #f3effa;
-  color: #241b35;
+  background: #f7f5fb;
+  color: #2e1065;
+  box-shadow: inset 0 0 0 2px #6d28d9;
 }
 .gift-total {
   margin-top: 14px;
   padding: 10px 12px;
-  border: 1px solid #362a4a;
+  border: 1px solid #b8aad3;
   border-radius: 10px;
-  background: #1e172e;
+  background: #e6e3ee;
 }
 .gift-total-line {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  color: #bda4ff;
+  color: #2e1065;
 }
 .gift-total-grand {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #362a4a;
-  color: #f3edff;
+  border-top: 1px solid #b8aad3;
+  color: #2e1065;
   font-family: Fraunces, Georgia, serif;
   font-size: 0.95rem;
 }
 .gift-total > small {
   display: block;
   margin-top: 6px;
-  color: #bda4ff;
+  color: #4c1d95;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 0.58rem;
   text-align: right;
@@ -717,7 +720,7 @@ summary {
   color: #6d28d9;
 }
 .gift-form .mail-status.success {
-  color: #d8c7ff;
+  color: #4c1d95;
 }
 .mail-status.error {
   color: #c2415a;
