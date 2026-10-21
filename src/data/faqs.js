@@ -5,7 +5,7 @@ export const HFAQ = [
   ],
   [
     'Can sessions be online?',
-    'Yes. Sessions are online via Google Meet, and in-person options depend on availability.',
+    'Yes. Sessions are online via Google Meet.',
   ],
   [
     'Do I need to be in crisis?',
@@ -22,6 +22,6 @@ export const HFAQ = [
   ],
   [
     'What happens after booking?',
-    'We verify your payment, confirm your session time, and send you the details.',
+    'We verify your payment, confirm your session time, and send you the consent form. After you sign the consent form, we confirm your booking. All this is done via your email.',
   ],
 ];
