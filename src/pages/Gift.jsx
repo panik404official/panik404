@@ -9,7 +9,7 @@ const GF = [
   ['How long is the voucher valid?', 'A full six months from the day it’s sent.'],
   [
     'Can they pick their own therapist?',
-    'You share what is going on through the booking form, and our team matches you with a suitable professional.',
+    'No, they share what is going on through the booking form, and our team matches them with a suitable professional.',
   ],
   ['Is it confidential?', 'Completely. You gift the session — you never see what’s discussed.'],
   [
