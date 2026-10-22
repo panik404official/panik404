@@ -179,7 +179,8 @@ class ConsentForm(Model):
 
     Everything typed into the form (including drawn signatures) is autosaved into `data`, so whoever opens
     the same link next sees the fields already filled. A revoked or expired link no longer opens.
-    status: open -> completed (signed), or revoked by an admin at any time.
+    status: open (client filling) -> submitted (client pressed Save) -> completed (assigned psychologist signed),
+    or revoked by an admin at any time. An admin assigns the psychologist, before or after the client saves.
     """
 
     id = fields.UUIDField(primary_key=True)
@@ -196,13 +197,20 @@ class ConsentForm(Model):
     completed_at = fields.DatetimeField(null=True)
     revoked_at = fields.DatetimeField(null=True)
     emailed_at = fields.DatetimeField(null=True)
+    submitted_at = fields.DatetimeField(null=True)
+    assigned_to = fields.ForeignKeyField("models.User", related_name="assigned_consent_forms", null=True,
+                                         on_delete=fields.SET_NULL)
+    assigned_by = fields.ForeignKeyField("models.User", related_name="consent_assignments_made", null=True,
+                                         on_delete=fields.SET_NULL)
+    assigned_at = fields.DatetimeField(null=True)
 
     class Meta:
         table = "consent_forms"
 
 
 class PartnerVerification(Model):
-    """A partner employee's details and ID document, uploaded before the discounted booking form opens.
+    """A partner employee's ID number and ID card photo, uploaded before the discounted booking form opens.
+    Name, email and phone come from the booking (the order's customer).
 
     status: pending (waiting for the team to check the ID) -> approved | rejected.
     `order` is set once the discounted booking is placed; each verification books one session.
@@ -228,3 +236,58 @@ class PartnerVerification(Model):
 
     class Meta:
         table = "partner_verifications"
+
+
+
+class User(Model):
+    """Someone who signs in to the admin panel. role "admin" can do everything (including managing users);
+    role "psychologist" only reaches the sections listed in `permissions` (see app/auth.py PERMISSIONS)."""
+
+    id = fields.UUIDField(primary_key=True)
+    username = fields.CharField(max_length=40, unique=True)  # stored lower-case
+    email = fields.CharField(max_length=320, unique=True)  # stored lower-case
+    name = fields.CharField(max_length=120)
+    role = fields.CharField(max_length=16, default="psychologist")
+    permissions = fields.JSONField(default=list)
+    qualification = fields.CharField(max_length=120, null=True)
+    password_hash = fields.CharField(max_length=255)
+    is_active = fields.BooleanField(default=True)
+    created_by = fields.ForeignKeyField("models.User", related_name="users_created", null=True,
+                                        on_delete=fields.SET_NULL)
+    last_login_at = fields.DatetimeField(null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "users"
+
+
+class UserSession(Model):
+    """A signed-in browser. Only a SHA-256 of the token is stored, so a database leak can't be replayed."""
+
+    id = fields.UUIDField(primary_key=True)
+    user = fields.ForeignKeyField("models.User", related_name="sessions", on_delete=fields.CASCADE)
+    token_hash = fields.CharField(max_length=64, unique=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    expires_at = fields.DatetimeField(db_index=True)
+    last_seen_at = fields.DatetimeField(null=True)
+    user_agent = fields.CharField(max_length=200, null=True)
+
+    class Meta:
+        table = "user_sessions"
+
+
+class Notification(Model):
+    """An in-panel notification (the bell). Emails are sent alongside, best effort."""
+
+    id = fields.UUIDField(primary_key=True)
+    user = fields.ForeignKeyField("models.User", related_name="notifications", on_delete=fields.CASCADE)
+    kind = fields.CharField(max_length=40)
+    title = fields.CharField(max_length=200)
+    body = fields.TextField(null=True)
+    link = fields.CharField(max_length=300, null=True)  # panel route, e.g. /admin/consent/<id>
+    read_at = fields.DatetimeField(null=True)
+    created_at = fields.DatetimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        table = "notifications"

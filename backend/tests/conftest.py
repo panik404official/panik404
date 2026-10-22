@@ -15,7 +15,8 @@ os.environ.update(
     NEON_DB_URL=DB_URL, ADMIN_API_KEY="test-admin-key-0123456789", IP_HASH_SECRET="test-ip-secret-0123456789",
     ENVIRONMENT="test", TRACK_FLUSH_INTERVAL="0.05", RATE_LIMIT_TRACK_PER_MIN="100000",
     RATE_LIMIT_ORDERS_PER_MIN="100000", RATE_LIMIT_INTAKE_PER_15MIN="100000",
-    RATE_LIMIT_CONTACT_PER_15MIN="100000", RATE_LIMIT_CONSENT_PER_MIN="100000", CORS_ORIGINS="http://localhost:5173",
+    RATE_LIMIT_CONTACT_PER_15MIN="100000", RATE_LIMIT_CONSENT_PER_MIN="100000",
+    RATE_LIMIT_LOGIN_PER_15MIN="100000", CORS_ORIGINS="http://localhost:5173",
     MAIL_USERNAME="", MAIL_PASSWORD="", ADMIN_EMAIL="team@panik.test",
 )
 
@@ -23,7 +24,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.main import create_app  # noqa: E402
 
-ADMIN = {"X-Admin-Key": "test-admin-key-0123456789"}
+KEY = "test-admin-key-0123456789"
+ADMIN = {"X-Admin-Key": KEY}
 ROOT = Path(__file__).resolve().parent.parent
 
 

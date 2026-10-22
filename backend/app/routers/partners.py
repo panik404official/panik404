@@ -1,7 +1,7 @@
 """Partner programmes (#/gift-a-session/<partner>).
 
 GET  /v1/partners/{slug}          name and discount, so the page shows the server's numbers
-POST /v1/partners/{slug}/verify   multipart: "data" (JSON PartnerVerifyIn) + "document" (ID card image or PDF).
+POST /v1/partners/{slug}/verify   multipart: "data" (JSON PartnerVerifyIn) + "document" (ID card image).
                                   Saves the record and returns its id, which the booking order then sends as
                                   partner_verification_id to get the discount.
 """

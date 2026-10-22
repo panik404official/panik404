@@ -82,6 +82,32 @@ Admin: `GET /v1/admin/partner-verifications` (`status`, `booked`, `q`) · `GET .
 All bookings must start at least 48 hours from now. The browser sends `preferred_at` (with its UTC offset) and the
 server rejects anything earlier (10-minute clock allowance); without `preferred_at`, date + time are read as Pakistan time.
 
+## Panel sign-in, users and permissions
+People sign in at `#/admin` with a username or email and a password (`POST /v1/auth/login`, then
+`Authorization: Bearer <token>`). On a fresh database the sign-in screen asks to create the first admin, which needs
+`ADMIN_API_KEY` once (`POST /v1/auth/setup`, only works while no user exists). After that, admins create everyone
+else on the Users page (`/v1/admin/users`) and choose a role:
+- **admin**: everything, including users;
+- **psychologist**: only the sections ticked for them (default: consent forms assigned to them). The section
+  permissions live in `app/auth.py` (`PERMISSIONS`, `PATH_PERMISSIONS`); unlisted admin endpoints are admin-only.
+Passwords are hashed with scrypt; only a SHA-256 of each session token is stored. Switching a user off or resetting
+their password signs them out everywhere. `X-Admin-Key: <ADMIN_API_KEY>` still works as a full-access system key for
+scripts and tests; keep it secret.
+
+Notifications: `GET /v1/admin/notifications` (+ `/count`, `/{id}/read`, `/read-all`) show in the panel's bell; each
+one is also emailed in the background (set `PANEL_URL` so the email links straight to the right page).
+
+### Consent flow
+1. An admin creates a link (optionally choosing the psychologist up front) and sends it to the client.
+2. The client fills it (autosaved) and presses **Save** (`POST /v1/consent/{token}/submit`, status `submitted`).
+   Every admin, and anyone with `consent_manage`, gets a notification + email.
+3. An admin assigns a psychologist (`POST /v1/admin/consent-forms/{id}/assign`); the psychologist is notified.
+   (If they were chosen up front, they're notified when the client saves.)
+4. The psychologist opens it in the panel, adds name, qualification, CNIC and signature
+   (`POST .../sign`, status `completed`); the panel builds the PDF and `POST .../email` sends it to `CONSENT_EMAIL`
+   and the client. Admins get a notification that it was signed.
+An admin can send a saved form back to the client (`POST .../reopen`) or close the link (`POST .../revoke`).
+
 ## Admin panel
 Open the site at `#/admin` (e.g. `http://localhost:5173/#/admin`) and enter `ADMIN_API_KEY`. The key is kept in
 sessionStorage only. Pages: overview, customers (search, sort, CSV export), a full customer profile (contact details,

@@ -1,7 +1,8 @@
 /* Consent form. Ported from the standalone consent HTML; every class is prefixed cf- so the storefront's
    .btn / .card / .grid / label / input rules can't leak in. */
 .cf,
-.cf-page {
+.cf-page,
+.cf-embed {
   --cf-ink: #1b1233;
   --cf-muted: #6b6382;
   --cf-lilac: #ece6fa;
@@ -667,4 +668,14 @@
   .cf-submit {
     display: none;
   }
+}
+.cf-sigimg {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 3 / 1;
+  object-fit: contain;
+  border: 1.5px dashed var(--cf-lilac-deep);
+  border-radius: 14px;
+  background: #fff;
 }

@@ -1,17 +1,25 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import { useAdmin } from '../ctx';
-import { ConsentState, CopyButton, DEFAULT_PSYCH, consentLink, emailLinkHref } from '../consentUtil';
+import { useAdmin, useMe } from '../ctx';
+import { ConsentState, CopyButton, consentLink, emailLinkHref } from '../consentUtil';
 import { fmtDT } from '../../consent/pdf';
 import { Empty, Loader, SearchBox, ago, when } from '../ui';
 
 const FILTERS = [
   ['', 'All'],
-  ['open', 'Open'],
+  ['open', 'Waiting for client'],
+  ['submitted', 'Filled by client'],
+  ['unassigned', 'No psychologist yet'],
   ['completed', 'Signed'],
   ['expired', 'Expired'],
   ['revoked', 'Closed'],
+];
+const MY_FILTERS = [
+  ['', 'All'],
+  ['submitted', 'Ready to sign'],
+  ['open', 'Waiting for client'],
+  ['completed', 'Signed'],
 ];
 const EXPIRY = [
   [1, '1 day'],
@@ -21,24 +29,30 @@ const EXPIRY = [
   [30, '30 days'],
   ['', 'Never'],
 ];
-const BLANK = { note: '', name: '', email: '', session_time: '', ...DEFAULT_PSYCH, expires: 7 };
+const BLANK = { note: '', name: '', email: '', session_time: '', assign_to: '', expires: 7 };
 
 function NewLink({ onCreated, onCancel }) {
   const [f, setF] = useState(BLANK);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const { data: psychs } = useAdmin('/psychologists');
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
     setErr('');
     try {
       const prefill = Object.fromEntries(
-        ['name', 'email', 'session_time', 'pname', 'pqual'].map((k) => [k, f[k].trim()]).filter(([, v]) => v),
+        ['name', 'email', 'session_time'].map((k) => [k, f[k].trim()]).filter(([, v]) => v),
       );
       const form = await api('/consent-forms', {
         method: 'POST',
-        body: { note: f.note.trim() || null, expires_in_days: f.expires === '' ? null : +f.expires, prefill },
+        body: {
+          note: f.note.trim() || null,
+          expires_in_days: f.expires === '' ? null : +f.expires,
+          prefill,
+          assign_to: f.assign_to || null,
+        },
       });
       onCreated(form);
     } catch (ex) {
@@ -51,8 +65,8 @@ function NewLink({ onCreated, onCancel }) {
     <form className="adm-panel adm-form" onSubmit={submit}>
       <h2>New consent link</h2>
       <p className="adm-sub">
-        Anything you fill in here appears in the form already. The client can change it. Everything they type is
-        saved as they go.
+        Anything you fill in here appears in the form already. The client can change it, and presses Save when done.
+        You can choose the psychologist now or after the client saves.
       </p>
       <div className="adm-form-grid">
         <label>
@@ -78,12 +92,16 @@ function NewLink({ onCreated, onCancel }) {
           </select>
         </label>
         <label>
-          Psychologist
-          <input value={f.pname} onChange={set('pname')} maxLength={200} />
-        </label>
-        <label>
-          Qualification
-          <input value={f.pqual} onChange={set('pqual')} maxLength={200} />
+          Psychologist (optional)
+          <select value={f.assign_to} onChange={set('assign_to')}>
+            <option value="">Choose later</option>
+            {psychs?.items.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+                {u.qualification ? ` · ${u.qualification}` : ''}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="wide">
           Private note (only admins see this)
@@ -135,11 +153,14 @@ function Created({ form, onClose }) {
 }
 
 export default function ConsentForms() {
-  const [state, setState] = useState('');
+  const { can } = useMe();
+  const manage = can('consent_manage');
+  const [state, setState] = useState(manage ? '' : 'submitted');
   const [q, setQ] = useState('');
   const [mode, setMode] = useState(''); // '' | 'new' | created form
   const nav = useNavigate();
   const { data, error, loading, reload } = useAdmin('/consent-forms', { state, q, limit: 200 });
+  const filters = manage ? FILTERS : MY_FILTERS;
   const [closing, setClosing] = useState('');
 
   const close = async (f) => {
@@ -159,16 +180,17 @@ export default function ConsentForms() {
   return (
     <>
       <header className="adm-head">
-        <h1>Consent forms</h1>
-        {!mode && (
+        <h1>{manage ? 'Consent forms' : 'Your consent forms'}</h1>
+        {manage && !mode && (
           <button className="adm-btn primary" onClick={() => setMode('new')}>
             New consent link
           </button>
         )}
       </header>
       <p className="adm-lede">
-        Create a private link, send it to the client, and every answer and signature is saved as they type. Close a
-        link and it stops opening.
+        {manage
+          ? 'Send a client a private link. When they press Save you get a notification; assign a psychologist, who is notified to review and sign.'
+          : 'Forms assigned to you. You get a notification when a client has filled one in; open it to review and sign.'}
       </p>
       {mode === 'new' && (
         <NewLink
@@ -183,7 +205,7 @@ export default function ConsentForms() {
 
       <div className="adm-toolbar">
         <div className="adm-seg" role="group" aria-label="Filter by status">
-          {FILTERS.map(([v, l]) => (
+          {filters.map(([v, l]) => (
             <button key={l} className={state === v ? 'on' : ''} aria-pressed={state === v} onClick={() => setState(v)}>
               {l}
             </button>
@@ -202,9 +224,9 @@ export default function ConsentForms() {
                     <th>Client</th>
                     <th>Session</th>
                     <th>Status</th>
-                    <th>Last opened</th>
-                    <th>Link</th>
-                    <th />
+                    <th>Psychologist</th>
+                    {manage && <th>Link</th>}
+                    {manage && <th />}
                   </tr>
                 </thead>
                 <tbody>
@@ -220,24 +242,45 @@ export default function ConsentForms() {
                       <td>{fmtDT(f.session_time) || '—'}</td>
                       <td>
                         <ConsentState form={f} />
-                        {f.state === 'open' && f.expires_at && <small className="block">until {when(f.expires_at)}</small>}
+                        {f.state === 'open' && f.expires_at && <small className="block">link until {when(f.expires_at)}</small>}
+                        {f.state === 'submitted' && f.submitted_at && <small className="block">saved {ago(f.submitted_at)}</small>}
                       </td>
-                      <td>{f.last_opened_at ? ago(f.last_opened_at) : 'Never'}</td>
-                      <td>{f.link_active ? <CopyButton text={consentLink(f.token)} /> : <span className="adm-muted">Inactive</span>}</td>
                       <td>
-                        {f.link_active && (
-                          <button className="adm-btn danger" disabled={closing === f.id} onClick={() => close(f)}>
-                            {closing === f.id ? 'Closing…' : 'Close link'}
-                          </button>
+                        {f.assigned_to ? (
+                          f.assigned_to.name
+                        ) : f.state === 'submitted' ? (
+                          <b className="adm-warn">Assign now</b>
+                        ) : (
+                          <span className="adm-muted">Not yet</span>
                         )}
                       </td>
+                      {manage && (
+                        <td>
+                          {f.link_active ? <CopyButton text={consentLink(f.token)} /> : <span className="adm-muted">{f.last_opened_at ? `Opened ${ago(f.last_opened_at)}` : 'Inactive'}</span>}
+                        </td>
+                      )}
+                      {manage && (
+                        <td>
+                          {f.link_active && (
+                            <button className="adm-btn danger" disabled={closing === f.id} onClick={() => close(f)}>
+                              {closing === f.id ? 'Closing…' : 'Close link'}
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <Empty>{state || q ? 'No consent forms match.' : 'No consent links yet. Create one to send to a client.'}</Empty>
+            <Empty>
+              {state || q
+                ? 'No consent forms match.'
+                : manage
+                  ? 'No consent links yet. Create one to send to a client.'
+                  : 'Nothing assigned to you yet.'}
+            </Empty>
           ))}
       </Loader>
     </>

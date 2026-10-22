@@ -36,8 +36,3 @@ export const loadForm = (token) => call(t(token));
 export const saveFields = (token, fields, keepalive = false) =>
   call(t(token), { method: 'PATCH', json: fields, keepalive });
 export const submitForm = (token, fields) => call(`${t(token)}/submit`, { method: 'POST', json: fields });
-export function emailCopy(token, pdfBlob, filename) {
-  const form = new FormData();
-  form.append('pdf', pdfBlob, filename);
-  return call(`${t(token)}/email`, { method: 'POST', form });
-}

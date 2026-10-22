@@ -47,7 +47,7 @@ export default function PartnerVerifications() {
         </button>
       </header>
       <p className="adm-lede">
-        Employees of partner companies (Ibex) upload their details and ID card first, then book at the partner discount.
+        Employees of partner companies (Ibex) upload their employee ID and a photo of their ID card first, then book at the partner discount.
         Check the ID, then mark the booking paid once the transfer arrives.
       </p>
       <div className="adm-toolbar">

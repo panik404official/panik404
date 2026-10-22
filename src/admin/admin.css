@@ -234,3 +234,33 @@
 .adm-doc { display: block; width: 100%; max-height: 70vh; object-fit: contain; border: 1px solid var(--a-line); border-radius: 8px; background: #fcfbff; }
 iframe.adm-doc { height: 70vh; }
 .adm-textarea { width: 100%; font: inherit; color: var(--a-ink); border: 1px solid #d9ccf5; border-radius: 6px; padding: 8px 10px; resize: vertical; }
+
+/* sign-in, users, notifications */
+.adm-login .adm-check, .adm-check { display: flex; gap: 8px; align-items: center; font-weight: 400; margin: 8px 0; }
+.adm-check input { width: auto; margin: 0; }
+.adm-note.ok { background: #ecfdf3; color: #166534; }
+.adm-form-grid.one { grid-template-columns: minmax(0, 1fr); }
+.adm-perms { border: 1px solid var(--a-line); border-radius: 8px; margin: 16px 0 8px; padding: 10px 14px; }
+.adm-perms legend { font-weight: 700; font-size: 0.85rem; color: var(--a-mute); padding: 0 6px; }
+.adm-table tr.adm-off td { opacity: 0.55; }
+.adm-side .adm-bell { display: flex; justify-content: space-between; align-items: center; margin: 0 0 10px; padding: 8px 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.08); text-decoration: none; color: #fff; font-weight: 700; }
+.adm-side .adm-bell:hover { text-decoration: none; background: rgba(255, 255, 255, 0.14); }
+.adm-side .adm-bell.active { background: #fff; color: var(--a-ink); }
+.adm-badge { background: #dc2626; color: #fff; border-radius: 999px; min-width: 22px; padding: 1px 7px; font-size: 0.75rem; text-align: center; }
+.adm-side-foot { flex-wrap: wrap; gap: 6px 12px; }
+.adm-side-foot .adm-me { display: flex; flex-direction: column; flex-basis: 100%; text-decoration: none; color: #fff; margin-bottom: 4px; }
+.adm-side-foot .adm-me small { color: #c4b5fd; }
+.adm-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.adm-notes button { width: 100%; text-align: left; display: grid; gap: 3px; background: #fff; border: 1px solid var(--a-line); border-radius: 10px; padding: 12px 14px; font: inherit; color: var(--a-ink); cursor: pointer; }
+.adm-notes li.unread button { border-color: #c4b5fd; background: #fcfaff; }
+.adm-notes button:hover { border-color: var(--a-ink); }
+.adm-notes-title { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.adm-notes-body { color: var(--a-mute); font-size: 0.9rem; }
+.adm-notes small { color: var(--a-mute); font-size: 0.78rem; }
+.adm-dot { width: 8px; height: 8px; border-radius: 50%; background: #7c3aed; display: inline-block; }
+.adm-status.c-submitted { background: #e0e7ff; color: #3730a3; }
+.adm-warn { color: #b45309; }
+.adm-attention { border-color: #c4b5fd; box-shadow: 0 0 0 3px #f1ebff; }
+.adm-linkbox select { flex: 1; min-width: 0; font: inherit; border: 1px solid #d9ccf5; border-radius: 6px; padding: 7px 10px; background: #fff; }
+.cf-embed { margin-top: 8px; }
+.cf-embed .cf-sig { margin-top: 6px; }

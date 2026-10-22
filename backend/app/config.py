@@ -30,11 +30,16 @@ class Settings(BaseSettings):
     rate_limit_intake_per_15min: int = 5  # gift / booking request emails
     rate_limit_contact_per_15min: int = 5
     rate_limit_consent_per_min: int = 240  # consent forms autosave while people type
+    rate_limit_login_per_15min: int = 10
 
     # Outgoing mail (Gmail SMTP with an app password). Requests that send email fail with 503 until set.
     admin_email: str = "ethancarter.signmakerz@gmail.com"
     contact_email: str | None = None  # Contact us messages go here (defaults to admin_email)
     consent_email: str | None = None  # signed consent forms go here (defaults to admin_email)
+    # Address of the admin panel, used for links in notification emails, e.g. https://example.com/#/admin
+    panel_url: str | None = None
+    session_hours: int = 12  # how long a sign-in lasts
+    session_remember_days: int = 30  # with "keep me signed in"
     mail_username: str | None = None
     mail_password: str | None = None
     mail_from: str | None = None

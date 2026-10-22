@@ -2,17 +2,22 @@
 
 GET    /v1/consent/{token}          load the form (404 unknown link, 410 closed or expired link)
 PATCH  /v1/consent/{token}          autosave: only the changed fields are sent and merged
-POST   /v1/consent/{token}/submit   final save + required-field check; locks the form as signed
-POST   /v1/consent/{token}/email    multipart "pdf": emails the signed copy to Panik and the client (once)
+POST   /v1/consent/{token}/submit   the client's Save: checks their part, locks the form, notifies the admins
+                                    (and the assigned psychologist, if one was chosen already)
+
+The psychologist signs in the panel afterwards (POST /v1/admin/consent-forms/{id}/sign), which is also where the
+signed PDF gets emailed. send_signed_copy() below does that emailing.
 """
 import logging
 import smtplib
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Path, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, Request
 
 from ..config import Settings
 from ..mailer import Attachment, Mail, MailNotConfigured, send_mail
+from ..models import ConsentForm
+from ..notify import notify, users_who_can
 from ..repos import consent as repo
 from ..schemas import ConsentData
 from ..security import limit
@@ -43,22 +48,33 @@ async def autosave(body: ConsentData, token: Token):
 
 
 @router.post("/{token}/submit")
-async def submit(body: ConsentData, token: Token):
+async def submit(body: ConsentData, token: Token, request: Request, background: BackgroundTasks):
     try:
         form = await repo.submit(token, body.model_dump(exclude_unset=True))
     except repo.ConsentError as e:
         _raise(e)
+    s: Settings = request.app.state.settings
+    d = form.data or {}
+    who = d.get("name") or "A client"
+    link = f"/admin/consent/{form.id}"
+    session = d.get("session_time", "").replace("T", " ") or "no time given"
+    await notify(s, background, await users_who_can("consent_manage"), kind="consent_submitted",
+                 title=f"{who} filled the consent form",
+                 body=f"{who} saved their consent form (session {session}). "
+                      + ("Assign a psychologist to review and sign it." if not form.assigned_to_id else
+                         "It is already assigned to a psychologist."),
+                 link=link)
+    if form.assigned_to_id:
+        await form.fetch_related("assigned_to")
+        await notify(s, background, [form.assigned_to], kind="consent_ready",
+                     title=f"{who}'s consent form is ready for you",
+                     body=f"{who} filled the consent form assigned to you. Review it and add your signature.",
+                     link=link)
     return repo.public_view(form)
 
 
-@router.post("/{token}/email")
-async def email_copy(request: Request, token: Token, pdf: UploadFile = File(...)):
-    s: Settings = request.app.state.settings
-    try:
-        form = await repo.completed_for_email(token)
-    except repo.ConsentError as e:
-        _raise(e)
-    content = await pdf.read(s.receipt_max_bytes + 1)
+async def send_signed_copy(s: Settings, form: ConsentForm, content: bytes) -> list[str]:
+    """Emails the signed PDF to Panik (CONSENT_EMAIL) and to the client. Raises HTTPException on failure."""
     if len(content) > s.receipt_max_bytes:
         raise HTTPException(413, "The PDF is too large.")
     if not content.startswith(b"%PDF-"):
@@ -85,7 +101,8 @@ async def email_copy(request: Request, token: Token, pdf: UploadFile = File(...)
             subject="Your signed Panik consent form",
             text="\n".join([
                 f"Hello {name},", "",
-                "Thank you for signing your informed consent form. Your signed copy is attached for your records.",
+                "Your informed consent form has been signed by you and your psychologist. "
+                "Your signed copy is attached for your records.",
                 f"Reference: {form.reference}", "",
                 "If you have any questions about the form, reply to this email.",
             ]),
@@ -97,6 +114,6 @@ async def email_copy(request: Request, token: Token, pdf: UploadFile = File(...)
         raise HTTPException(503, "Email delivery is not configured yet.") from e
     except (smtplib.SMTPException, OSError) as e:
         log.error("consent email delivery failed: %s", e)
-        raise HTTPException(502, "We could not send the email. Save the PDF and email it to Panik instead.") from e
+        raise HTTPException(502, "We could not send the email. Download the PDF and send it instead.") from e
     await repo.mark_emailed(form)
-    return {"message": "Signed copy emailed.", "to": [m.to for m in mails]}
+    return [m.to for m in mails]

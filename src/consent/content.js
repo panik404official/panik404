@@ -7,7 +7,7 @@ export const STEPS = [
   'Fill in your details',
   'Read each section',
   'Sign with your finger or mouse',
-  'Sign and finish to send it to Panik',
+  'Press Save to send it to Panik',
 ];
 
 export const TERMS = [
@@ -125,9 +125,8 @@ export const CONFIRM = {
 
 export const PANIK_EMAIL = 'Panik404offcial@gmail.com';
 export const SITE = 'www.cornflowerblue-seahorse-446896.hostingersite.com';
-export const DEFAULT_PSYCH = { pname: 'Mashal Zia', pqual: 'Clinical Psychologist' };
 
-/** Required fields, in page order. Mirrors missing_fields() in backend/app/repos/consent.py. */
+/** What the client must fill before Save, in page order. Mirrors client_missing() in backend/app/repos/consent.py. */
 export function checks(f) {
   const txt = (k) => String(f[k] ?? '').trim();
   const digits = (k) => txt(k).replace(/\D/g, '').length;
@@ -141,8 +140,6 @@ export function checks(f) {
     { k: 'session_time', ok: !!txt('session_time'), msg: 'Enter the session date and time.' },
     { k: 'ack', ok: f.ack === true, msg: 'Tick the box to confirm you consent.' },
     { k: 'sig_client', ok: !!f.sig_client, msg: 'Draw your signature.' },
-    { k: 'pname', ok: !!txt('pname'), msg: "Enter the psychologist's name." },
-    { k: 'sig_psych', ok: !!f.sig_psych, msg: 'The psychologist needs to sign.' },
   ];
   if (f.gneed) {
     list.push(

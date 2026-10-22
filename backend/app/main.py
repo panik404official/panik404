@@ -13,7 +13,7 @@ from tortoise.exceptions import DBConnectionError, OperationalError
 from .config import get_settings
 from .db import tortoise_config
 from .ingest import IngestBuffer
-from .routers import admin, consent, contact, health, intake, orders, partners, track
+from .routers import admin, auth, consent, contact, health, intake, orders, partners, track, users
 from .security import RateLimiter
 
 log = logging.getLogger("app")
@@ -45,7 +45,8 @@ async def lifespan(app: FastAPI):
                           "orders": RateLimiter(s.rate_limit_orders_per_min),
                           "intake": RateLimiter(s.rate_limit_intake_per_15min, window=15 * 60),
                           "contact": RateLimiter(s.rate_limit_contact_per_15min, window=15 * 60),
-                          "consent": RateLimiter(s.rate_limit_consent_per_min)}
+                          "consent": RateLimiter(s.rate_limit_consent_per_min),
+                          "login": RateLimiter(s.rate_limit_login_per_15min, window=15 * 60)}
     try:
         yield
     finally:
@@ -63,16 +64,17 @@ def create_app() -> FastAPI:
                   docs_url=None if prod else "/docs", redoc_url=None, openapi_url=None if prod else "/openapi.json")
 
     app.add_middleware(CORSMiddleware, allow_origins=s.cors_list, allow_methods=["GET", "POST", "PATCH"],
-                       allow_headers=["Content-Type", "Idempotency-Key", "X-Admin-Key"], max_age=600)
+                       allow_headers=["Content-Type", "Idempotency-Key", "X-Admin-Key", "Authorization"], max_age=600)
 
     @app.middleware("http")
     async def limit_body(request: Request, call_next):
         cl = request.headers.get("content-length")
         path = request.url.path
-        if path in UPLOAD_PATHS or (path.startswith("/v1/consent/") and path.endswith("/email")) or (
+        if path in UPLOAD_PATHS or (path.startswith("/v1/admin/consent-forms/") and path.endswith("/email")) or (
                 path.startswith("/v1/partners/") and path.endswith("/verify")):
             cap = s.receipt_max_bytes + MAX_BODY_BYTES
-        elif path.startswith("/v1/consent/"):
+        elif path.startswith("/v1/consent/") or (path.startswith("/v1/admin/consent-forms/")
+                                                 and path.endswith("/sign")):
             cap = CONSENT_BODY_BYTES
         else:
             cap = MAX_BODY_BYTES
@@ -90,7 +92,7 @@ def create_app() -> FastAPI:
                             headers={"Retry-After": "5"})
 
     for r in (health.router, track.router, orders.router, intake.router, contact.router, consent.router,
-              partners.router, admin.router):
+              partners.router, auth.router, users.router, admin.router):
         app.include_router(r)
     return app
 

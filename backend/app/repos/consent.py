@@ -1,5 +1,8 @@
 """Consent forms opened through admin-generated links.
 
+Flow: open (client fills, autosaved) -> submitted (client pressed Save; admins are notified) -> an admin assigns a
+psychologist (they are notified) -> completed (the psychologist signs in the panel; the signed PDF is emailed).
+
 The link token is the only key to a form, so anyone holding the link can read and fill it (that is how the
 client and the psychologist share one form). A revoked or expired link stops working everywhere at once.
 """
@@ -14,10 +17,11 @@ from tortoise import connections
 from tortoise.expressions import Q
 from tortoise.transactions import in_transaction
 
-from ..models import ConsentForm
+from ..models import ConsentForm, User
 from ..schemas import ConsentCreate
 
 SIG_FIELDS = ("sig_client", "sig_psych", "sig_guardian")
+PSYCH_FIELDS = ("pname", "pqual", "pcnic", "sig_psych")
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
@@ -40,7 +44,8 @@ def link_active(form: ConsentForm) -> bool:
 
 
 def state(form: ConsentForm) -> str:
-    """What the admin sees: revoked, expired (an unsigned link that ran out), completed or open."""
+    """What the panel shows: revoked, expired (a link that ran out before the client saved), open, submitted
+    (client saved, waiting for the psychologist) or completed."""
     if form.status == "revoked":
         return "revoked"
     if form.status == "open" and is_expired(form):
@@ -60,7 +65,8 @@ def _check_open_link(form: ConsentForm | None) -> ConsentForm:
 
 def public_view(form: ConsentForm) -> dict[str, Any]:
     return {"status": form.status, "data": form.data or {}, "reference": form.reference,
-            "completed_at": form.completed_at, "expires_at": form.expires_at, "emailed": form.emailed_at is not None}
+            "submitted_at": form.submitted_at, "completed_at": form.completed_at, "expires_at": form.expires_at,
+            "emailed": form.emailed_at is not None}
 
 
 # ---- public ------------------------------------------------------------------------------------------
@@ -86,47 +92,56 @@ async def save_fields(token: str, fields: dict[str, Any]) -> datetime:
     if rows:
         return rows[0]["updated_at"]
     form = _check_open_link(await ConsentForm.get_or_none(token=token))
-    if form.status == "completed":
-        raise ConsentError(409, "This form is already signed and can no longer be changed.")
+    if form.status in ("submitted", "completed"):
+        raise ConsentError(409, "This form was already saved and can no longer be changed.")
     raise ConsentError(409, "This form could not be saved. Reload the page and try again.")
 
 
-def missing_fields(d: dict[str, Any]) -> list[str]:
-    def text(k):
-        return str(d.get(k) or "").strip()
+def _text(d, k):
+    return str(d.get(k) or "").strip()
 
+
+def client_missing(d: dict[str, Any]) -> list[str]:
+    """What the client must fill before pressing Save."""
     def digits(k):
-        return len(re.sub(r"\D", "", text(k)))
+        return len(re.sub(r"\D", "", _text(d, k)))
 
     checks = {
-        "name": bool(text("name")), "dob": bool(text("dob")), "phone": digits("phone") >= 7,
-        "email": bool(EMAIL_RE.match(text("email"))), "ename": bool(text("ename")), "ephone": digits("ephone") >= 7,
-        "session_time": bool(text("session_time")), "ack": d.get("ack") is True, "sig_client": bool(d.get("sig_client")),
-        "pname": bool(text("pname")), "sig_psych": bool(d.get("sig_psych")),
+        "name": bool(_text(d, "name")), "dob": bool(_text(d, "dob")), "phone": digits("phone") >= 7,
+        "email": bool(EMAIL_RE.match(_text(d, "email"))), "ename": bool(_text(d, "ename")),
+        "ephone": digits("ephone") >= 7, "session_time": bool(_text(d, "session_time")), "ack": d.get("ack") is True,
+        "sig_client": bool(d.get("sig_client")),
     }
     if d.get("gneed"):
-        checks.update(gname=bool(text("gname")), grel=bool(text("grel")), sig_guardian=bool(d.get("sig_guardian")))
+        checks.update(gname=bool(_text(d, "gname")), grel=bool(_text(d, "grel")),
+                      sig_guardian=bool(d.get("sig_guardian")))
     return [k for k, ok in checks.items() if not ok]
 
 
+def psych_missing(d: dict[str, Any]) -> list[str]:
+    return [k for k, ok in {"pname": bool(_text(d, "pname")), "sig_psych": bool(d.get("sig_psych"))}.items() if not ok]
+
+
 async def submit(token: str, fields: dict[str, Any]) -> ConsentForm:
+    """The client pressed Save: check their part, then lock the form for the psychologist."""
+    fields = {k: v for k, v in fields.items() if k not in PSYCH_FIELDS}  # the psychologist fills these in the panel
     async with in_transaction():
         form = _check_open_link(await ConsentForm.filter(token=token).select_for_update().first())
-        if form.status == "completed":
-            raise ConsentError(409, "This form is already signed.")
+        if form.status != "open":
+            raise ConsentError(409, "This form was already saved.")
         data = {**(form.data or {}), **fields}
-        missing = missing_fields(data)
+        missing = client_missing(data)
         if missing:
             raise ConsentError(422, "Some required fields are missing: " + ", ".join(missing))
-        t = now()
-        form.data, form.status, form.completed_at = data, "completed", t
-        form.reference = "PNK-" + secrets.token_hex(4).upper()
-        await form.save(update_fields=["data", "status", "completed_at", "reference", "updated_at"])
+        form.data, form.status, form.submitted_at = data, "submitted", now()
+        await form.save(update_fields=["data", "status", "submitted_at", "updated_at"])
     return form
 
 
-async def completed_for_email(token: str) -> ConsentForm:
-    form = _check_open_link(await ConsentForm.get_or_none(token=token))
+async def completed_for_email(form_id: UUID) -> ConsentForm:
+    form = await ConsentForm.get_or_none(id=form_id)
+    if form is None:
+        raise ConsentError(404, "Consent form not found")
     if form.status != "completed":
         raise ConsentError(409, "Sign the form before emailing it.")
     if form.emailed_at:
@@ -138,17 +153,20 @@ async def mark_emailed(form: ConsentForm) -> None:
     await ConsentForm.filter(id=form.id, emailed_at__isnull=True).update(emailed_at=now())
 
 
-# ---- admin -------------------------------------------------------------------------------------------
+# ---- admin ----------------------------------------------------------------------------------------------
 def admin_row(form: ConsentForm, full: bool = False) -> dict[str, Any]:
     d = form.data or {}
+    assignee = form.assigned_to if form.assigned_to_id else None
     row = {
         "id": str(form.id), "token": form.token, "status": form.status, "state": state(form),
-        "link_active": link_active(form), "note": form.note, "reference": form.reference,
+        "link_active": link_active(form) and form.status == "open", "note": form.note, "reference": form.reference,
         "client_name": d.get("name"), "client_email": d.get("email"), "session_time": d.get("session_time"),
         "psychologist": d.get("pname"), "created_at": form.created_at, "updated_at": form.updated_at,
         "expires_at": form.expires_at, "first_opened_at": form.first_opened_at,
-        "last_opened_at": form.last_opened_at, "completed_at": form.completed_at,
-        "revoked_at": form.revoked_at, "emailed_at": form.emailed_at,
+        "last_opened_at": form.last_opened_at, "submitted_at": form.submitted_at, "completed_at": form.completed_at,
+        "revoked_at": form.revoked_at, "emailed_at": form.emailed_at, "assigned_at": form.assigned_at,
+        "assigned_to": {"id": str(assignee.id), "name": assignee.name, "qualification": assignee.qualification}
+        if assignee else None,
         "signatures": [k for k in SIG_FIELDS if d.get(k)],
     }
     if full:
@@ -156,24 +174,38 @@ def admin_row(form: ConsentForm, full: bool = False) -> dict[str, Any]:
     return row
 
 
-async def create(body: ConsentCreate) -> ConsentForm:
+async def _psychologist(user_id: UUID) -> User:
+    u = await User.get_or_none(id=user_id)
+    if u is None or not u.is_active or u.role != "psychologist":
+        raise ConsentError(422, "Choose an active psychologist.")
+    return u
+
+
+async def create(body: ConsentCreate, by: UUID | None) -> ConsentForm:
     expires = now() + timedelta(days=body.expires_in_days) if body.expires_in_days else None
-    data = {k: v for k, v in body.prefill.model_dump(exclude_none=True).items() if v != ""}
-    return await ConsentForm.create(token=secrets.token_urlsafe(24), note=body.note or None, data=data,
-                                    expires_at=expires)
+    data = {k: v for k, v in body.prefill.model_dump(exclude_none=True).items() if v != "" and k not in PSYCH_FIELDS}
+    assignee = await _psychologist(body.assign_to) if body.assign_to else None
+    form = await ConsentForm.create(token=secrets.token_urlsafe(24), note=body.note or None, data=data,
+                                    expires_at=expires, assigned_to_id=assignee.id if assignee else None,
+                                    assigned_by_id=by if assignee else None, assigned_at=now() if assignee else None)
+    return await get(form.id)
 
 
-async def list_forms(state_filter: str | None, q: str | None, limit: int) -> list[dict]:
-    qs = ConsentForm.all()
+async def list_forms(state_filter: str | None, q: str | None, limit: int, only_for: UUID | None) -> list[dict]:
+    qs = ConsentForm.all().select_related("assigned_to")
+    if only_for:
+        qs = qs.filter(assigned_to_id=only_for)
     t = now()
     if state_filter == "revoked":
         qs = qs.filter(status="revoked")
-    elif state_filter == "completed":
-        qs = qs.filter(status="completed")
+    elif state_filter in ("completed", "submitted"):
+        qs = qs.filter(status=state_filter)
     elif state_filter == "open":
         qs = qs.filter(Q(status="open") & (Q(expires_at__isnull=True) | Q(expires_at__gt=t)))
     elif state_filter == "expired":
         qs = qs.filter(status="open", expires_at__lte=t)
+    elif state_filter == "unassigned":
+        qs = qs.filter(status__in=["open", "submitted"], assigned_to_id__isnull=True)
     rows = await qs.order_by("-created_at").limit(500 if q else limit)
     if q and q.strip():
         needle = q.strip().lower()
@@ -184,14 +216,58 @@ async def list_forms(state_filter: str | None, q: str | None, limit: int) -> lis
 
 
 async def get(form_id: UUID) -> ConsentForm | None:
-    return await ConsentForm.get_or_none(id=form_id)
+    return await ConsentForm.filter(id=form_id).select_related("assigned_to").first()
 
 
 async def revoke(form_id: UUID) -> ConsentForm:
-    form = await ConsentForm.get_or_none(id=form_id)
+    form = await get(form_id)
     if form is None:
         raise ConsentError(404, "Consent form not found")
     if form.status != "revoked":
         form.status, form.revoked_at = "revoked", now()
         await form.save(update_fields=["status", "revoked_at", "updated_at"])
     return form
+
+
+async def assign(form_id: UUID, user_id: UUID | None, by: UUID | None) -> tuple[ConsentForm, User | None]:
+    form = await get(form_id)
+    if form is None:
+        raise ConsentError(404, "Consent form not found")
+    if form.status in ("completed", "revoked"):
+        raise ConsentError(409, "A signed or closed form can't be reassigned.")
+    assignee = await _psychologist(user_id) if user_id else None
+    form.assigned_to_id = assignee.id if assignee else None
+    form.assigned_by_id = by if assignee else None
+    form.assigned_at = now() if assignee else None
+    await form.save(update_fields=["assigned_to_id", "assigned_by_id", "assigned_at", "updated_at"])
+    return await get(form_id), assignee
+
+
+async def reopen(form_id: UUID) -> ConsentForm:
+    """Send a saved form back to the client (for example, to correct a detail). Their link works again."""
+    form = await get(form_id)
+    if form is None:
+        raise ConsentError(404, "Consent form not found")
+    if form.status != "submitted":
+        raise ConsentError(409, "Only a form the client saved, and nobody signed yet, can be reopened.")
+    form.status, form.submitted_at = "open", None
+    await form.save(update_fields=["status", "submitted_at", "updated_at"])
+    return form
+
+
+async def sign(form_id: UUID, fields: dict[str, Any]) -> ConsentForm:
+    async with in_transaction():
+        form = await ConsentForm.filter(id=form_id).select_for_update().first()
+        if form is None:
+            raise ConsentError(404, "Consent form not found")
+        if form.status != "submitted":
+            raise ConsentError(409, "Only a form the client has saved can be signed." if form.status == "open"
+                               else "This form can't be signed any more.")
+        data = {**(form.data or {}), **fields}
+        missing = client_missing(data) + psych_missing(data)
+        if missing:
+            raise ConsentError(422, "Some required fields are missing: " + ", ".join(missing))
+        form.data, form.status, form.completed_at = data, "completed", now()
+        form.reference = "PNK-" + secrets.token_hex(4).upper()
+        await form.save(update_fields=["data", "status", "completed_at", "reference", "updated_at"])
+    return await get(form_id)

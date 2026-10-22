@@ -21,6 +21,7 @@ async def _with_orders(rows: list[dict]) -> list[dict]:
     for r in rows:
         o = orders.get(r["order_id"])
         r["partner_name"] = PARTNERS[r["partner"]].name if r["partner"] in PARTNERS else r["partner"]
+        # who it is comes from the booking; before booking only the employee ID is known
         r["name"] = o["customer__name"] if o else None
         r["email"] = o["customer__email"] if o else None
         r["phone"] = o["customer__phone"] if o else None
@@ -46,7 +47,7 @@ async def list_verifications(partner: str | None, status: str | None, booked: bo
     if q and q.strip():
         t = q.strip()
         qs = qs.filter(Q(employee_id__icontains=t) | Q(order__customer__name__icontains=t)
-                | Q(order__customer__email__icontains=t) | Q(order__customer__phone__icontains=t))
+                       | Q(order__customer__email__icontains=t) | Q(order__customer__phone__icontains=t))
     rows = await qs.order_by("-created_at").limit(limit).values(*LIST_FIELDS)
     return await _with_orders(rows)
 

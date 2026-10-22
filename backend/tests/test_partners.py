@@ -9,8 +9,8 @@ from app.routers import intake
 from .conftest import ADMIN, future_date, q
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
-WHO = {"name": "Bilal Ibex", "email": "bilal@ibex.example", "phone": "0300 1112223", "employee_id": "IBX-4471",
-       "department": "Support"}
+WHO = {"employee_id": "IBX-4471"}
+BUYER = {"name": "Bilal Ibex", "email": "bilal@ibex.example", "phone": "0300 1112223"}
 BOOKING_FIELDS = {
     "age": 30, "role": "Corporate Employee", "concern": ["Burnout"], "desc": None, "duration": "1-6 months",
     "distress": 5, "danger": "No", "suicidal": "No", "harm": "No", "medical": "No", "treatment": "None",
@@ -34,8 +34,8 @@ def verify(client, ids=None, doc=("id-card.png", PNG, "image/png"), **over):
     return client.post("/v1/partners/ibex/verify", data={"data": json.dumps(data)}, files={"document": doc})
 
 
-def book(client, ids, verification_id=None, email=WHO["email"], **over):
-    body = {**ids, "kind": "booking", "customer": {"name": WHO["name"], "email": email, "phone": WHO["phone"]},
+def book(client, ids, verification_id=None, email=BUYER["email"], **over):
+    body = {**ids, "kind": "booking", "customer": {**BUYER, "email": email},
             "preferred_date": future_date(), "preferred_time": "4:00 PM", **over}
     if verification_id:
         body["partner_verification_id"] = verification_id
@@ -62,8 +62,9 @@ def test_verification_is_stored_with_the_document(client, ids):
 
 def test_verification_rejects_bad_input(client):
     assert verify(client, doc=("x.png", b"not an image", "image/png")).status_code == 415
+    assert verify(client, doc=("id.pdf", b"%PDF-1.4 scan", "application/pdf")).status_code == 415  # images only
     assert verify(client, employee_id="").status_code == 422
-    assert verify(client, email="nope").status_code == 422
+    assert verify(client, name="Not asked for any more").status_code == 422
 
 
 def test_discounted_booking_emails_team_with_id_and_links_records(client, ids, sent):
@@ -89,9 +90,8 @@ def test_discounted_booking_emails_team_with_id_and_links_records(client, ids, s
     assert book(client, ids, vid).status_code == 409
 
 
-def test_verification_must_match_email_and_not_be_rejected_or_old(client, ids):
+def test_verification_must_not_be_rejected_or_old(client, ids):
     vid = verify(client, ids).json()["id"]
-    assert book(client, ids, vid, email="someone@else.example").status_code == 422
     q("UPDATE partner_verifications SET status = 'rejected' WHERE id = $1", uuid.UUID(vid))
     assert book(client, ids, vid).status_code == 409
     old = verify(client, ids).json()["id"]
@@ -119,6 +119,10 @@ def test_admin_lists_views_and_reviews_verifications(client, ids):
     assert client.get("/v1/admin/partner-verifications").status_code == 401
     items = client.get("/v1/admin/partner-verifications", params={"q": "IBX-ADMIN-1"}, headers=ADMIN).json()["items"]
     assert items[0]["id"] == vid and items[0]["partner_name"] == "Ibex" and "file_data" not in items[0]
+    assert items[0]["name"] is None  # not booked yet: only the employee ID is known
+    o = book(client, ids, vid).json()
+    items = client.get("/v1/admin/partner-verifications", params={"q": "bilal@ibex"}, headers=ADMIN).json()["items"]
+    assert items[0]["id"] == vid and items[0]["name"] == "Bilal Ibex" and items[0]["order"]["id"] == o["id"]
     f = client.get(f"/v1/admin/partner-verifications/{vid}/file", headers=ADMIN)
     assert f.status_code == 200 and f.content == PNG and f.headers["content-type"] == "image/png"
     r = client.patch(f"/v1/admin/partner-verifications/{vid}", json={"status": "approved", "admin_note": "ID ok"},

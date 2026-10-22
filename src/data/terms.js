@@ -1,7 +1,7 @@
 // Terms & Conditions. Edit the text here; the page renders it as-is.
 // Block types: string = paragraph, { ul: [...] } = bullet list, { h: '6.1 Title' } = sub-heading,
 // { email: true } = the contact email as a link, { callout: '...' } = highlighted line.
-export const SITE = 'panik404.com';
+export const SITE = 'cornflowerblue-seahorse-446896.hostingersite.com';
 export const CONTACT_EMAIL = `hello@${SITE}`;
 
 export const TERMS_INTRO = [

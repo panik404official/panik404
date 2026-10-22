@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ApiError, emailCopy, loadForm, saveFields, submitForm } from './api';
+import { ApiError, loadForm, saveFields, submitForm } from './api';
 import { ACK, ACK_CHECK, CONFIRM, INTRO, PANIK_EMAIL, SITE, STEPS, TERMS, checks } from './content';
-import { buildPdf, fmtDT, fmtStamp, saveBlob, slug } from './pdf';
+import { buildPdf, fmtStamp, saveBlob, slug } from './pdf';
 import SigPad from './SigPad';
 import './consent.css';
 
-// Fields the API accepts. Everything here is autosaved as it is typed.
+// Fields the client fills. Everything here is autosaved as it is typed. The psychologist's part (pname, pqual,
+// pcnic, sig_psych) is filled in the panel after the client presses Save.
 const FIELDS = [
-  'name', 'dob', 'phone', 'email', 'ename', 'ephone', 'date', 'session_time', 'complaint', 'ack', 'pname',
-  'pqual', 'pcnic', 'gneed', 'gname', 'grel', 'gift', 'rname', 'rrel', 'rcontact', 'rcode', 'sig_client',
-  'sig_psych', 'sig_guardian',
+  'name', 'dob', 'phone', 'email', 'ename', 'ephone', 'date', 'session_time', 'complaint', 'ack', 'gneed', 'gname',
+  'grel', 'gift', 'rname', 'rrel', 'rcontact', 'rcode', 'sig_client', 'sig_guardian',
 ];
 const SAVE_DELAY = 700;
 const FONTS =
@@ -66,7 +66,7 @@ function Closed({ title, text }) {
 
 export default function ConsentPage() {
   const { token } = useParams();
-  const [phase, setPhase] = useState('loading'); // loading | open | completed | closed | missing
+  const [phase, setPhase] = useState('loading'); // loading | open | submitted | completed | closed | missing
   const [closedText, setClosedText] = useState('');
   const [f, setF] = useState({});
   const [meta, setMeta] = useState({});
@@ -74,7 +74,7 @@ export default function ConsentPage() {
   const [summaryErr, setSummaryErr] = useState('');
   const [save, setSave] = useState({ state: 'idle' }); // idle | saving | saved | error
   const [busy, setBusy] = useState('');
-  const [result, setResult] = useState(null); // { blob, emailed, emailError, to }
+  const [justSaved, setJustSaved] = useState(false);
   const [showSigned, setShowSigned] = useState(false);
 
   const pending = useRef({});
@@ -101,9 +101,15 @@ export default function ConsentPage() {
   }, []);
 
   const apply = useCallback((res) => {
-    setMeta({ reference: res.reference, completedAt: res.completed_at, expiresAt: res.expires_at, emailed: res.emailed });
+    setMeta({
+      reference: res.reference,
+      submittedAt: res.submitted_at,
+      completedAt: res.completed_at,
+      expiresAt: res.expires_at,
+      emailed: res.emailed,
+    });
     setF((cur) => ({ ...cur, ...res.data }));
-    setPhase(res.status === 'completed' ? 'completed' : 'open');
+    setPhase(res.status === 'completed' ? 'completed' : res.status === 'submitted' ? 'submitted' : 'open');
   }, []);
 
   /* ---------- load ---------- */
@@ -210,30 +216,12 @@ export default function ConsentPage() {
     setBusy('submit');
     try {
       await flush();
-      const res = await submitForm(token, pick(fRef.current));
-      apply(res);
-      const filename = `Panik-Consent-${slug(res.data.name)}.pdf`;
-      let blob = null;
-      try {
-        blob = await buildPdf(res.data, { reference: res.reference, completedAt: res.completed_at });
-      } catch {
-        blob = null;
-      }
-      let emailed = false,
-        emailError = '',
-        to = [];
-      if (blob) {
-        try {
-          to = (await emailCopy(token, blob, filename)).to;
-          emailed = true;
-        } catch (err) {
-          emailError = err.message;
-        }
-      }
-      setResult({ blob, filename, emailed, emailError, to });
+      apply(await submitForm(token, pick(fRef.current)));
+      setJustSaved(true);
+      setShowSigned(false);
       window.scrollTo(0, 0);
     } catch (err) {
-      if (!handleApiError(err)) setSummaryErr(err.message || 'The form could not be signed. Please try again.');
+      if (!handleApiError(err)) setSummaryErr(err.message || 'The form could not be saved. Please try again.');
     } finally {
       setBusy('');
     }
@@ -242,8 +230,7 @@ export default function ConsentPage() {
   const downloadPdf = async () => {
     setBusy('pdf');
     try {
-      const blob =
-        result?.blob || (await buildPdf(f, { reference: meta.reference, completedAt: meta.completedAt }));
+      const blob = await buildPdf(f, { reference: meta.reference, completedAt: meta.completedAt });
       saveBlob(blob, `Panik-Consent-${slug(f.name)}.pdf`);
     } finally {
       setBusy('');
@@ -262,7 +249,7 @@ export default function ConsentPage() {
 
   const list = checks(f);
   const done = list.filter((c) => c.ok).length;
-  const locked = phase === 'completed';
+  const locked = phase === 'completed' || phase === 'submitted';
 
   const field = (k, label, { type = 'text', req, full, area, ...rest } = {}) => (
     <div className={`cf-field${full ? ' full' : ''}${er[k] ? ' invalid' : ''}`} data-k={k}>
@@ -285,17 +272,7 @@ export default function ConsentPage() {
     </div>
   );
 
-  const doneView = locked && (!showSigned || result);
-  const mailto =
-    `mailto:${PANIK_EMAIL}?cc=${encodeURIComponent(f.email || '')}` +
-    `&subject=${encodeURIComponent(`Signed consent form - ${f.name || ''}`)}` +
-    `&body=${encodeURIComponent(
-      [
-        'Hello Panik team,', '', 'Please find my signed informed consent form attached (PDF).', '',
-        `Client: ${f.name || ''}`, `Session: ${fmtDT(f.session_time)}`, `Reference: ${meta.reference || ''}`,
-      ].join('\n'),
-    )}`;
-
+  const doneView = locked && !showSigned;
   return (
     <div className="cf">
       <div className="cf-top">
@@ -325,54 +302,64 @@ export default function ConsentPage() {
       <div className="cf-page">
         {doneView ? (
           <section className="cf-sheet cf-done">
-            <h1>Thank you{f.name ? `, ${f.name.split(' ')[0]}` : ''}.</h1>
-            <p className="cf-intro">
-              This consent form was signed{meta.completedAt ? ` on ${fmtStamp(meta.completedAt)}` : ''}. Reference{' '}
-              <b>{meta.reference}</b>.
-            </p>
-            <div className="cf-cards">
-              <div className="cf-card">
-                <h3>Your signed copy</h3>
-                <p>A PDF with your answers, the full terms you agreed to, and the signatures.</p>
-                <div className="cf-row">
-                  <button className="cf-btn primary" type="button" onClick={downloadPdf} disabled={busy === 'pdf'}>
-                    {busy === 'pdf' ? 'Preparing…' : 'Save PDF'}
-                  </button>
-                  <button className="cf-btn" type="button" onClick={() => setShowSigned(true)} hidden={!!result}>
-                    View signed form
-                  </button>
-                </div>
-              </div>
-              {(result?.emailed || meta.emailed) && (
-                <div className="cf-card ok">
-                  <h3>Sent to Panik</h3>
-                  <p>
-                    The signed PDF was emailed to Panik
-                    {result?.to?.length > 1 ? ` and to ${result.to[1]}` : ''}. There is nothing else to do.
-                  </p>
-                </div>
-              )}
-              {result && !result.emailed && (
-                <div className="cf-card">
-                  <h3>Email it to Panik</h3>
-                  <p>
-                    {result.emailError ? `${result.emailError} ` : ''}Your answers are saved with Panik. To send the
-                    PDF too, save it above, then email it to <span className="cf-addr">{PANIK_EMAIL}</span>.
-                  </p>
-                  <div className="cf-row">
-                    <a className="cf-btn primary" href={mailto}>
-                      Open email
-                    </a>
+            {phase === 'submitted' ? (
+              <>
+                <h1>{justSaved ? 'Saved' : 'Already saved'}{f.name ? `, thank you ${f.name.split(' ')[0]}` : ''}.</h1>
+                <p className="cf-intro">
+                  Your consent form reached Panik{meta.submittedAt ? ` on ${fmtStamp(meta.submittedAt)}` : ''}. Your
+                  psychologist will review it and add their signature. You’ll get the signed copy by email
+                  {f.email ? ` at ${f.email}` : ''}.
+                </p>
+                <div className="cf-cards">
+                  <div className="cf-card ok">
+                    <h3>Nothing else to do</h3>
+                    <p>If something in your answers needs changing, contact Panik and they can send the form back to you.</p>
+                    <div className="cf-row">
+                      <button className="cf-btn" type="button" onClick={() => setShowSigned(true)}>
+                        View your answers
+                      </button>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
+              </>
+            ) : (
+              <>
+                <h1>Signed{f.name ? `, thank you ${f.name.split(' ')[0]}` : ''}.</h1>
+                <p className="cf-intro">
+                  Your consent form was signed by you and your psychologist
+                  {meta.completedAt ? ` on ${fmtStamp(meta.completedAt)}` : ''}. Reference <b>{meta.reference}</b>.
+                </p>
+                <div className="cf-cards">
+                  <div className="cf-card">
+                    <h3>Your signed copy</h3>
+                    <p>A PDF with your answers, the full terms you agreed to, and both signatures.</p>
+                    <div className="cf-row">
+                      <button className="cf-btn primary" type="button" onClick={downloadPdf} disabled={busy === 'pdf'}>
+                        {busy === 'pdf' ? 'Preparing…' : 'Save PDF'}
+                      </button>
+                      <button className="cf-btn" type="button" onClick={() => setShowSigned(true)}>
+                        View signed form
+                      </button>
+                    </div>
+                  </div>
+                  {meta.emailed && (
+                    <div className="cf-card ok">
+                      <h3>Emailed to you</h3>
+                      <p>A copy of the signed PDF was also sent to your email.</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </section>
         ) : (
           <form className="cf-sheet" onSubmit={finish} noValidate>
             {locked && (
               <p className="cf-banner">
-                Signed {meta.completedAt ? fmtStamp(meta.completedAt) : ''}. This copy is read-only.{' '}
+                {phase === 'completed'
+                  ? `Signed ${meta.completedAt ? fmtStamp(meta.completedAt) : ''}.`
+                  : `Saved ${meta.submittedAt ? fmtStamp(meta.submittedAt) : ''}.`}{' '}
+                This copy is read-only.{' '}
                 <button type="button" className="cf-link" onClick={() => setShowSigned(false)}>
                   Back
                 </button>
@@ -393,8 +380,8 @@ export default function ConsentPage() {
                 </ol>
                 {!locked && (
                   <p className="cf-note">
-                    Your answers save automatically. Anyone who opens this same link, such as your psychologist, sees
-                    them and can continue where you left off.
+                    Your answers save automatically as you type, so you can leave and come back to this link. Press
+                    Save at the end to send the form to Panik.
                   </p>
                 )}
               </div>
@@ -445,19 +432,23 @@ export default function ConsentPage() {
 
               <section className="cf-sec">
                 <h2>Psychologist details and declaration</h2>
-                <div className="cf-grid">
-                  {field('pname', 'Psychologist’s full name', { req: true, maxLength: 200 })}
-                  {field('pqual', 'Professional qualification', { maxLength: 200 })}
-                  {field('pcnic', 'CNIC', { inputMode: 'numeric', placeholder: '13 digits, no dashes', maxLength: 20 })}
-                </div>
-                <SigPad
-                  id="sig_psych"
-                  label="Psychologist signature"
-                  value={f.sig_psych || ''}
-                  onChange={(v) => set('sig_psych', v)}
-                  disabled={locked}
-                  error={er.sig_psych}
-                />
+                {phase === 'completed' ? (
+                  <>
+                    <div className="cf-grid">
+                      {field('pname', 'Psychologist’s full name')}
+                      {field('pqual', 'Professional qualification')}
+                    </div>
+                    <div className="cf-sig">
+                      <span className="cf-lab">Psychologist signature</span>
+                      {f.sig_psych && <img className="cf-sigimg" src={f.sig_psych} alt="Psychologist signature" />}
+                    </div>
+                  </>
+                ) : (
+                  <p className="cf-note">
+                    Your psychologist completes this part after you press Save. Panik assigns them and they add their
+                    details and signature; then the signed copy is emailed to you.
+                  </p>
+                )}
               </section>
 
               <section className="cf-sec">
@@ -512,7 +503,7 @@ export default function ConsentPage() {
                 <div className="cf-body">
                   <Blocks blocks={CONFIRM.blocks} />
                 </div>
-                <p className="cf-note">The psychologist’s signature above covers this confirmation.</p>
+                <p className="cf-note">The psychologist’s signature in the section above covers this confirmation.</p>
               </section>
             </fieldset>
 
@@ -525,9 +516,12 @@ export default function ConsentPage() {
                 )}
                 <div className="cf-row">
                   <button className="cf-btn lime lg" type="submit" disabled={!!busy}>
-                    {busy === 'submit' ? 'Signing…' : 'Sign and finish'}
+                    {busy === 'submit' ? 'Saving…' : 'Save'}
                   </button>
-                  <span className="cf-note">A signed PDF is emailed to Panik and to you. You can save a copy too.</span>
+                  <span className="cf-note">
+                    Sends your form to Panik. After that it can’t be changed here; your psychologist then signs it and
+                    you get the signed copy by email.
+                  </span>
                 </div>
               </div>
             )}

@@ -1,8 +1,12 @@
 import { useState } from 'react';
-import { DEFAULT_PSYCH } from '../consent/content';
 
-export const STATE_LABEL = { open: 'Open', completed: 'Signed', expired: 'Expired', revoked: 'Closed' };
-export { DEFAULT_PSYCH };
+export const STATE_LABEL = {
+  open: 'Waiting for client',
+  submitted: 'Filled by client',
+  completed: 'Signed',
+  expired: 'Expired',
+  revoked: 'Closed',
+};
 
 /** Public link for a form token. Uses this site's address, so it works on localhost and in production. */
 export const consentLink = (token) => `${location.origin}${location.pathname}#/consent/${token}`;
@@ -15,7 +19,7 @@ export function emailLinkHref(form) {
     'Before your session, please read and sign your informed consent form here:',
     consentLink(form.token),
     '',
-    'Your answers save as you type, so you can come back to the same link to finish.',
+    'Your answers save as you type, so you can come back to the same link to finish. Press Save at the end.',
     form.expires_at ? `The link works until ${new Date(form.expires_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}.` : '',
     '',
     'Panik',

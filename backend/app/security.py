@@ -3,7 +3,7 @@ import hmac
 import time
 from collections import defaultdict, deque
 
-from fastapi import Header, HTTPException, Request
+from fastapi import HTTPException, Request
 
 
 def client_ip(request: Request, trust_proxy: bool) -> str:
@@ -17,12 +17,6 @@ def client_ip(request: Request, trust_proxy: bool) -> str:
 def hash_ip(ip: str, secret: str) -> str:
     """Keyed hash: we can count unique IPs but never store or recover the address."""
     return hmac.new(secret.encode(), ip.encode(), hashlib.sha256).hexdigest()[:32]
-
-
-async def require_admin(request: Request, x_admin_key: str | None = Header(None)) -> None:
-    expected = request.app.state.settings.admin_api_key
-    if not x_admin_key or not hmac.compare_digest(x_admin_key.encode(), expected.encode()):
-        raise HTTPException(status_code=401, detail="Invalid or missing admin key")
 
 
 class RateLimiter:

@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from app import notify as notify_mod
 from app.routers import consent as consent_router, contact as contact_router
 
 from .conftest import ADMIN, q
@@ -10,8 +11,9 @@ SIG = "data:image/png;base64,iVBORw0KGgo="
 FULL = {
     "name": "Sara Client", "dob": "1995-04-02", "phone": "0300 1234567", "email": "Sara.Client@example.com",
     "ename": "Ali", "ephone": "0300 7654321", "session_time": "2026-11-02T16:00", "ack": True,
-    "sig_client": SIG, "pname": "Mashal Zia", "sig_psych": SIG,
+    "sig_client": SIG,
 }
+PSYCH = {"pname": "Mashal Zia", "pqual": "Clinical Psychologist", "sig_psych": SIG}
 
 
 @pytest.fixture()
@@ -23,6 +25,7 @@ def sent(monkeypatch):
 
     monkeypatch.setattr(contact_router, "send_mail", fake_send)
     monkeypatch.setattr(consent_router, "send_mail", fake_send)
+    monkeypatch.setattr(notify_mod, "send_mail", fake_send)
     return mails
 
 
@@ -63,11 +66,11 @@ def test_contact_validation(client, sent):
 # ---- consent forms -------------------------------------------------------------------------------------
 def test_admin_creates_link_and_prefill_is_visible(client):
     f = new_form(client, note="Sara 2 Nov", expires_in_days=3,
-                 prefill={"name": "Sara Client", "pname": "Mashal Zia", "pqual": "Clinical Psychologist"})
+                 prefill={"name": "Sara Client", "pname": "ignored: the psychologist fills this in the panel"})
     assert f["state"] == "open" and f["link_active"] and len(f["token"]) >= 30
     r = client.get(f"/v1/consent/{f['token']}")
     assert r.status_code == 200
-    assert r.json()["data"] == {"name": "Sara Client", "pname": "Mashal Zia", "pqual": "Clinical Psychologist"}
+    assert r.json()["data"] == {"name": "Sara Client"}
     assert client.get(f"/v1/admin/consent-forms/{f['id']}", headers=ADMIN).json()["first_opened_at"]
 
 
@@ -91,31 +94,49 @@ def test_autosave_rejects_bad_fields(client):
     assert client.patch(f"/v1/consent/{tok}", json={"name": "x" * 500}).status_code == 422
 
 
-def test_submit_requires_everything_then_locks(client, sent):
-    tok = new_form(client)["token"]
+def test_client_save_then_sign_in_panel_then_email(client, sent):
+    f = new_form(client)
+    tok = f["token"]
     r = client.post(f"/v1/consent/{tok}/submit", json={"name": "Sara"})
-    assert r.status_code == 422 and "sig_psych" in r.json()["detail"]
-    # a guardian becomes required once ticked
+    assert r.status_code == 422 and "sig_client" in r.json()["detail"] and "sig_psych" not in r.json()["detail"]
     r = client.post(f"/v1/consent/{tok}/submit", json={**FULL, "gneed": True})
     assert r.status_code == 422 and "sig_guardian" in r.json()["detail"]
 
-    r = client.post(f"/v1/consent/{tok}/submit", json={**FULL, "gneed": False})
+    # the client cannot fill the psychologist's part
+    r = client.post(f"/v1/consent/{tok}/submit", json={**FULL, "gneed": False, "pname": "Me", "sig_psych": SIG})
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["status"] == "completed" and body["reference"].startswith("PNK-")
+    assert body["status"] == "submitted" and body["reference"] is None and "pname" not in body["data"]
     assert client.patch(f"/v1/consent/{tok}", json={"name": "Changed"}).status_code == 409
     assert client.post(f"/v1/consent/{tok}/submit", json=FULL).status_code == 409
-    # the signed form still opens (read-only) and shows the saved answers
-    assert client.get(f"/v1/consent/{tok}").json()["data"]["name"] == "Sara Client"
+    assert client.get(f"/v1/consent/{tok}").json()["status"] == "submitted"
 
-    pdf = ("consent.pdf", b"%PDF-1.4 signed", "application/pdf")
-    assert client.post(f"/v1/consent/{tok}/email", files={"pdf": ("x.pdf", b"nope", "application/pdf")}).status_code == 415
-    r = client.post(f"/v1/consent/{tok}/email", files={"pdf": pdf})
+    # signing happens in the panel
+    assert client.post(f"/v1/admin/consent-forms/{f['id']}/sign", json={"pname": "", "sig_psych": SIG},
+                       headers=ADMIN).status_code == 422
+    r = client.post(f"/v1/admin/consent-forms/{f['id']}/sign", json=PSYCH, headers=ADMIN)
     assert r.status_code == 200, r.text
-    team, mine = sent
-    assert team.to == "team@panik.test" and body["reference"] in team.subject
+    signed = r.json()
+    assert signed["state"] == "completed" and signed["reference"].startswith("PNK-")
+    assert signed["data"]["pname"] == "Mashal Zia"
+    assert client.get(f"/v1/consent/{tok}").json()["status"] == "completed"
+
+    url = f"/v1/admin/consent-forms/{f['id']}/email"
+    pdf = ("consent.pdf", b"%PDF-1.4 signed", "application/pdf")
+    assert client.post(url, files={"pdf": ("x.pdf", b"nope", "application/pdf")}, headers=ADMIN).status_code == 415
+    r = client.post(url, files={"pdf": pdf}, headers=ADMIN)
+    assert r.status_code == 200, r.text
+    team, mine = sent[-2:]
+    assert team.to == "team@panik.test" and signed["reference"] in team.subject
     assert mine.to == "Sara.Client@example.com" and mine.attachments[0].content.startswith(b"%PDF-")
-    assert client.post(f"/v1/consent/{tok}/email", files={"pdf": pdf}).status_code == 409
+    assert client.post(url, files={"pdf": pdf}, headers=ADMIN).status_code == 409
+
+
+def test_reopen_lets_the_client_edit_again(client):
+    f = new_form(client)
+    client.post(f"/v1/consent/{f['token']}/submit", json=FULL)
+    assert client.post(f"/v1/admin/consent-forms/{f['id']}/reopen", headers=ADMIN).json()["state"] == "open"
+    assert client.patch(f"/v1/consent/{f['token']}", json={"name": "Sara K."}).status_code == 200
 
 
 def test_revoked_and_expired_links_stop_opening(client):

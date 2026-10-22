@@ -253,6 +253,7 @@ class ConsentCreate(Strict):
     note: str | None = Field(None, max_length=200)
     expires_in_days: int | None = Field(7, ge=1, le=365, description="null = never expires")
     prefill: ConsentData = Field(default_factory=ConsentData)
+    assign_to: UUID | None = None  # optionally pick the psychologist up front
 
 
 # ---- partner programmes ----------------------------------------------------------------------------
@@ -268,6 +269,76 @@ class PartnerVerifyIn(Strict):
 class PartnerReview(Strict):
     status: Literal["pending", "approved", "rejected"] | None = None
     admin_note: str | None = Field(None, max_length=500)
+
+
+# ---- panel users -----------------------------------------------------------------------------------
+Username = Annotated[str, Field(min_length=3, max_length=40, pattern=r"^[A-Za-z0-9._-]+$")]
+Password = Annotated[str, Field(min_length=8, max_length=200)]
+
+
+def _lower_str(v):
+    return v.strip().lower() if isinstance(v, str) else v
+
+
+class LoginIn(Strict):
+    login: str = Field(min_length=1, max_length=320, description="username or email")
+    password: str = Field(min_length=1, max_length=200)
+    remember: bool = False
+
+
+class SetupIn(Strict):
+    admin_key: str = Field(min_length=1, max_length=500)
+    name: str = Field(min_length=1, max_length=120)
+    username: Username
+    email: EmailStr
+    password: Password
+
+    _l = field_validator("username", "email")(_lower_str)
+
+
+class PasswordChange(Strict):
+    current_password: str = Field(min_length=1, max_length=200)
+    new_password: Password
+
+
+class UserCreate(Strict):
+    name: str = Field(min_length=1, max_length=120)
+    username: Username
+    email: EmailStr
+    password: Password
+    role: Literal["admin", "psychologist"] = "psychologist"
+    permissions: list[str] | None = None  # None = the default for the role
+    qualification: str | None = Field(None, max_length=120)
+
+    _l = field_validator("username", "email")(_lower_str)
+
+
+class UserUpdate(Strict):
+    name: str | None = Field(None, min_length=1, max_length=120)
+    username: Username | None = None
+    email: EmailStr | None = None
+    password: Password | None = None  # an admin resetting someone's password
+    role: Literal["admin", "psychologist"] | None = None
+    permissions: list[str] | None = None
+    qualification: str | None = Field(None, max_length=120)
+    is_active: bool | None = None
+
+    _l = field_validator("username", "email")(_lower_str)
+
+
+class ConsentAssign(Strict):
+    user_id: UUID | None = None  # None = unassign
+
+
+class ConsentSign(Strict):
+    """The psychologist's part, filled in the panel after the client saved the form."""
+
+    pname: str = Field(min_length=1, max_length=200)
+    pqual: str | None = Field(None, max_length=200)
+    pcnic: str | None = Field(None, max_length=20)
+    sig_psych: str
+
+    _sig = field_validator("sig_psych")(_sig)
 
 
 class StatusUpdate(Strict):

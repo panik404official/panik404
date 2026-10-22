@@ -1025,6 +1025,7 @@ footer a {
 }
 @media (max-width: 820px) {
   .shero {
+    margin-top: 40px;
     left: 18px;
     right: 18px;
     top: 18px;
@@ -1401,7 +1402,6 @@ footer .footer-legal a {
   text-decoration: underline;
   cursor: pointer;
 }
-
 .partner-title {
   font-size: clamp(1.3rem, 3vw, 1.7rem);
   margin: 0 0 6px;

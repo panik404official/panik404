@@ -78,7 +78,7 @@ export default function App() {
           <Route path="/shop/:sort" element={<ShopRoute add={add} />} />
           <Route path="/why-us" element={<Why />} />
           <Route path="/gift-a-session" element={<Gift />} />
-          <Route path="/gift-a-session/:partner" element={<PartnerBooking />} />
+          <Route path="/book-a-session/:partner" element={<PartnerBooking />} />
           <Route path="/book-a-session" element={<Book />} />
           <Route path="/cart" element={<Cart cart={cart} setCart={setCart} />} />
           <Route path="/corporate" element={<Corporate />} />
