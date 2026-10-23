@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { api, AuthError, authApi, getToken, setToken } from './api';
+import { authApi, getToken, onUnread, setToken } from './api';
 import { AdminCtx } from './ctx';
 import { ROLE_LABEL } from './perms';
 import Overview from './pages/Overview';
@@ -37,7 +37,6 @@ const NAV = [
   ['/admin/catalogue', 'Products & payments', 'catalogue'],
   ['/admin/users', 'Users', 'admin'],
 ];
-const BELL_EVERY_MS = 30000;
 
 function SignIn({ onIn }) {
   const [mode, setMode] = useState('loading'); // loading | login | setup
@@ -146,18 +145,11 @@ export default function AdminApp() {
       .finally(() => setBooting(false));
   }, []);
 
-  const refreshBell = useCallback(() => {
-    api('/notifications/count')
-      .then((r) => setUnread(r.unread))
-      .catch((e) => e instanceof AuthError && logout());
-  }, [logout]);
-
+  // The bell count arrives with every panel response (see api.js), so nothing here polls the server.
   useEffect(() => {
-    if (!me) return undefined;
-    refreshBell();
-    const id = setInterval(() => document.visibilityState === 'visible' && refreshBell(), BELL_EVERY_MS);
-    return () => clearInterval(id);
-  }, [me, refreshBell]);
+    onUnread(setUnread);
+    return () => onUnread(null);
+  }, []);
 
   if (booting) return <div className="adm adm-login"><p className="adm-loading">Loading…</p></div>;
   if (!me) return <SignIn onIn={setMe} />;
@@ -169,7 +161,7 @@ export default function AdminApp() {
   const guard = (need, el) => (can(need) ? el : <Navigate to={home} replace />);
 
   return (
-    <AdminCtx.Provider value={{ logout, me, can, refreshBell }}>
+    <AdminCtx.Provider value={{ logout, me, can }}>
       <div className="adm">
         <aside className={`adm-side${menu ? ' open' : ''}`}>
           <div className="adm-brand">

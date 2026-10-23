@@ -59,7 +59,7 @@ function AssignPanel({ f, onDone }) {
 }
 
 function SignPanel({ f, me, onSigned }) {
-  const [p, setP] = useState({ pname: me.name || '', pqual: me.qualification || '', pcnic: '', sig_psych: '' });
+  const [p, setP] = useState({ pname: me.name || '', pqual: me.qualification || '', sig_psych: '' });
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const set = (k) => (e) => setP({ ...p, [k]: e.target.value });
@@ -72,7 +72,7 @@ function SignPanel({ f, me, onSigned }) {
     try {
       const signed = await api(`/consent-forms/${f.id}/sign`, {
         method: 'POST',
-        body: { pname: p.pname.trim(), pqual: p.pqual.trim() || null, pcnic: p.pcnic.trim() || null, sig_psych: p.sig_psych },
+        body: { pname: p.pname.trim(), pqual: p.pqual.trim() || null, sig_psych: p.sig_psych },
       });
       // Build the signed PDF here and email it to Panik and the client.
       setBusy('email');
@@ -108,10 +108,6 @@ function SignPanel({ f, me, onSigned }) {
         <label>
           Professional qualification
           <input value={p.pqual} onChange={set('pqual')} maxLength={200} />
-        </label>
-        <label>
-          CNIC
-          <input value={p.pcnic} onChange={set('pcnic')} inputMode="numeric" maxLength={20} placeholder="13 digits, no dashes" />
         </label>
       </div>
       <div className="cf-embed">
@@ -273,7 +269,6 @@ export default function ConsentDetail() {
                 <dl className="adm-fields">
                   <Field label="Name">{f.data.pname}</Field>
                   <Field label="Qualification">{f.data.pqual}</Field>
-                  <Field label="CNIC">{f.data.pcnic}</Field>
                 </dl>
               </section>
               <section className="adm-panel">

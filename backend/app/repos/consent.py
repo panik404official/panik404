@@ -21,7 +21,7 @@ from ..models import ConsentForm, User
 from ..schemas import ConsentCreate
 
 SIG_FIELDS = ("sig_client", "sig_psych", "sig_guardian")
-PSYCH_FIELDS = ("pname", "pqual", "pcnic", "sig_psych")
+PSYCH_FIELDS = ("pname", "pqual", "sig_psych")
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 

@@ -103,7 +103,7 @@ one is also emailed in the background (set `PANEL_URL` so the email links straig
    Every admin, and anyone with `consent_manage`, gets a notification + email.
 3. An admin assigns a psychologist (`POST /v1/admin/consent-forms/{id}/assign`); the psychologist is notified.
    (If they were chosen up front, they're notified when the client saves.)
-4. The psychologist opens it in the panel, adds name, qualification, CNIC and signature
+4. The psychologist opens it in the panel, adds name, qualification and signature
    (`POST .../sign`, status `completed`); the panel builds the PDF and `POST .../email` sends it to `CONSENT_EMAIL`
    and the client. Admins get a notification that it was signed.
 An admin can send a saved form back to the client (`POST .../reopen`) or close the link (`POST .../revoke`).

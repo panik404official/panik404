@@ -1,27 +1,19 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import { useAdmin, useMe } from '../ctx';
+import { useAdmin } from '../ctx';
 import { Empty, Loader, ago } from '../ui';
 
 export default function Notifications() {
   const { data, error, loading, reload } = useAdmin('/notifications', { limit: 100 });
-  const { refreshBell } = useMe();
   const nav = useNavigate();
-
-  useEffect(() => {
-    if (data) refreshBell();
-  }, [data, refreshBell]);
 
   const open = async (n) => {
     if (!n.read_at) await api(`/notifications/${n.id}/read`, { method: 'POST' }).catch(() => {});
-    refreshBell();
     if (n.link) nav(n.link);
     else reload();
   };
   const readAll = async () => {
     await api('/notifications/read-all', { method: 'POST' });
-    refreshBell();
     reload();
   };
 

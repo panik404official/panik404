@@ -29,6 +29,13 @@ export const setToken = (token, remember = false) => {
   }
 };
 
+// The server adds the signed-in user's unread notification count to every panel response, so the bell
+// updates as a side effect of normal requests. No polling.
+let unreadListener = null;
+export const onUnread = (fn) => {
+  unreadListener = fn;
+};
+
 export class AuthError extends Error {}
 export class ForbiddenError extends Error {}
 
@@ -55,6 +62,8 @@ async function request(url, { method = 'GET', body, form, token = getToken() } =
   } catch {
     throw new Error('Could not reach the API. Check that the backend is running and CORS allows this site.');
   }
+  const unread = res.headers.get('X-Unread-Notifications');
+  if (unread !== null && unreadListener) unreadListener(Number(unread) || 0);
   if (res.status === 401) {
     const detail = (await res.json().catch(() => ({}))).detail;
     throw new AuthError(message(detail, 401) || 'Please sign in again.');

@@ -7,7 +7,7 @@ import SigPad from './SigPad';
 import './consent.css';
 
 // Fields the client fills. Everything here is autosaved as it is typed. The psychologist's part (pname, pqual,
-// pcnic, sig_psych) is filled in the panel after the client presses Save.
+// sig_psych) is filled in the panel after the client presses Save.
 const FIELDS = [
   'name', 'dob', 'phone', 'email', 'ename', 'ephone', 'date', 'session_time', 'complaint', 'ack', 'gneed', 'gname',
   'grel', 'gift', 'rname', 'rrel', 'rcontact', 'rcode', 'sig_client', 'sig_guardian',

@@ -233,7 +233,6 @@ class ConsentData(Strict):
     ack: bool | None = None
     pname: Text | None = None
     pqual: Text | None = None
-    pcnic: str | None = Field(None, max_length=20)
     gneed: bool | None = None
     gname: Text | None = None
     grel: Text | None = None
@@ -335,7 +334,6 @@ class ConsentSign(Strict):
 
     pname: str = Field(min_length=1, max_length=200)
     pqual: str | None = Field(None, max_length=200)
-    pcnic: str | None = Field(None, max_length=20)
     sig_psych: str
 
     _sig = field_validator("sig_psych")(_sig)

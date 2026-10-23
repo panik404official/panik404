@@ -13,13 +13,15 @@ from tortoise.exceptions import DBConnectionError, OperationalError
 from .config import get_settings
 from .db import tortoise_config
 from .ingest import IngestBuffer
+from .models import Notification
 from .routers import admin, auth, consent, contact, health, intake, orders, partners, track, users
 from .security import RateLimiter
 
 log = logging.getLogger("app")
 MAX_BODY_BYTES = 64 * 1024
 UPLOAD_PATHS = {"/v1/gifts/request", "/v1/bookings/request"}  # multipart with a receipt file
-CONSENT_BODY_BYTES = 1024 * 1024  # consent autosave / submit carry drawn signatures as PNG data URLs
+CONSENT_BODY_BYTES = 1024 * 1024
+UNREAD_HEADER = "X-Unread-Notifications"  # consent autosave / submit carry drawn signatures as PNG data URLs
 
 
 async def _maintain_partitions() -> None:
@@ -64,7 +66,20 @@ def create_app() -> FastAPI:
                   docs_url=None if prod else "/docs", redoc_url=None, openapi_url=None if prod else "/openapi.json")
 
     app.add_middleware(CORSMiddleware, allow_origins=s.cors_list, allow_methods=["GET", "POST", "PATCH"],
-                       allow_headers=["Content-Type", "Idempotency-Key", "X-Admin-Key", "Authorization"], max_age=600)
+                       allow_headers=["Content-Type", "Idempotency-Key", "X-Admin-Key", "Authorization"],
+                       expose_headers=[UNREAD_HEADER], max_age=600)
+
+    @app.middleware("http")
+    async def unread_count(request: Request, call_next):
+        """Every panel response carries the signed-in user's unread notification count, so the bell stays
+        current without the panel ever polling for it."""
+        response = await call_next(request)
+        if request.url.path.startswith(("/v1/admin/", "/v1/auth/me")):
+            p = getattr(request.state, "principal", None)
+            if p is not None and p.user is not None:
+                n = await Notification.filter(user_id=p.user.id, read_at__isnull=True).count()
+                response.headers[UNREAD_HEADER] = str(n)
+        return response
 
     @app.middleware("http")
     async def limit_body(request: Request, call_next):

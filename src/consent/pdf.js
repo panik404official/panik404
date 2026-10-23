@@ -168,7 +168,6 @@ export async function buildPdf(f, { reference, completedAt }) {
   heading(n++, 'Psychologist details and declaration');
   kv('Full name', f.pname);
   kv('Qualification', f.pqual);
-  kv('CNIC', f.pcnic);
   y += 4;
   sig('Psychologist signature', f.sig_psych, f.pname || '', f.date);
   heading(n++, 'Parent or legal guardian');

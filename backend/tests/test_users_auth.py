@@ -126,6 +126,11 @@ def test_consent_flow_notifies_admin_then_psychologist(client, boss, mails):
     # 1. the client fills the form and presses Save -> the admin is notified (bell + email)
     assert client.post(f"/v1/consent/{f['token']}/submit", json=CLIENT).status_code == 200
     assert unread(client, at) == 1
+    # every panel response carries the count, so the panel never needs to poll for it
+    assert client.get("/v1/admin/consent-forms", headers=bearer(at)).headers["x-unread-notifications"] == "1"
+    assert client.get("/v1/auth/me", headers=bearer(at)).headers["x-unread-notifications"] == "1"
+    assert client.get("/v1/admin/consent-forms", headers=bearer(pt)).headers["x-unread-notifications"] == "0"
+    assert "x-unread-notifications" not in client.get("/v1/admin/overview", headers=ADMIN).headers
     n = client.get("/v1/admin/notifications", headers=bearer(at)).json()["items"][0]
     assert n["kind"] == "consent_submitted" and "Sara Client" in n["title"] and n["link"] == f"/admin/consent/{f['id']}"
     assert any(m.to == "hira@example.com" and "Sara Client" in m.subject for m in mails)
