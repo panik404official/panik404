@@ -10,7 +10,9 @@ export default function OrderDetail() {
     <Loader error={error} loading={loading} onRetry={reload}>
       {o && (
         <>
-          <p className="adm-crumb"><Link to="/admin/orders">Orders</Link></p>
+          <p className="adm-crumb">
+            {o.kind === 'booking' ? <Link to="/admin/sessions?tab=bookings">Sessions</Link> : <Link to="/admin/orders">Orders</Link>}
+          </p>
           <header className="adm-head"><h1>Order #{o.order_no}</h1></header>
           <div className="adm-cols wide-left">
             <OrderCard order={o} onChanged={reload} linkTitle={false} />

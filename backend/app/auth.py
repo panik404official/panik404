@@ -20,7 +20,7 @@ PERMISSIONS: dict[str, str] = {
     "consent_assigned": "Consent forms assigned to them (view and sign)",
     "consent_manage": "All consent forms (create links, assign psychologists, close links)",
     "overview": "Overview and analytics",
-    "orders": "Orders",
+    "orders": "Orders and session bookings",
     "customers": "Customers",
     "visitors": "Visitors and live activity",
     "partners": "Partner bookings (Ibex)",
@@ -45,7 +45,9 @@ PATH_PERMISSIONS: list[tuple[str, str]] = [
     ("/v1/admin/products", "catalogue"),
     ("/v1/admin/payments", "catalogue"),
 ]
-SELF_SERVICE_PREFIXES = ("/v1/admin/notifications", "/v1/admin/consent-forms", "/v1/admin/psychologists")
+# These check access per record in their endpoints (e.g. a psychologist sees only their own sessions).
+SELF_SERVICE_PREFIXES = ("/v1/admin/notifications", "/v1/admin/consent-forms", "/v1/admin/psychologists",
+                         "/v1/admin/meetings")
 
 # ---- passwords (scrypt from the standard library: no extra dependency) -----------------------------------
 _N, _R, _P = 2**14, 8, 1

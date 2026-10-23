@@ -264,3 +264,29 @@ iframe.adm-doc { height: 70vh; }
 .adm-linkbox select { flex: 1; min-width: 0; font: inherit; border: 1px solid #d9ccf5; border-radius: 6px; padding: 7px 10px; background: #fff; }
 .cf-embed { margin-top: 8px; }
 .cf-embed .cf-sig { margin-top: 6px; }
+
+/* sessions (Google Meet) */
+.adm-status.m-scheduled { background: #ede9fe; color: #5b21b6; }
+.adm-status.m-live { background: #dcfce7; color: #166534; }
+.adm-status.m-ended { background: #f1f1f4; color: #52525b; }
+.adm-status.m-cancelled { background: #fee2e2; color: #991b1b; }
+.adm h2 .adm-status { vertical-align: middle; font-family: Nunito, sans-serif; margin-left: 6px; }
+.adm-live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #16a34a; margin-right: 6px; vertical-align: 1px;
+  animation: adm-pulse 1.6s ease-in-out infinite; }
+@keyframes adm-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.55); } 60% { box-shadow: 0 0 0 5px rgba(22, 163, 74, 0); } }
+.adm-row-live td { background: #f3fdf6; }
+.adm-live-panel { border-color: #86efac; box-shadow: 0 0 0 3px #ecfdf3; }
+.adm-meet { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 4px 0 8px; }
+.adm-meet code { font-size: 0.95rem; background: var(--a-soft); padding: 6px 10px; border-radius: 6px; overflow-wrap: anywhere; }
+.adm-seg .adm-count { margin-left: 6px; font-size: 0.75rem; background: var(--a-soft); color: var(--a-ink); padding: 0 6px; border-radius: 99px; }
+.adm-seg button.on .adm-count { background: rgba(255, 255, 255, 0.22); color: #fff; }
+.adm-panel h4 { margin: 18px 0 6px; }
+
+/* payment receipts */
+.adm-receipt { margin-top: 14px; }
+.adm-receipt h4 { margin: 0 0 8px; }
+.adm-receipt-img { display: block; padding: 0; border: 1px solid var(--a-line); border-radius: 8px; background: #fcfbff; cursor: zoom-in; max-width: 260px; }
+.adm-receipt-img.big { max-width: 100%; cursor: zoom-out; }
+.adm-receipt-img img { display: block; width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; }
+.adm-receipt-img:focus-visible { outline: 3px solid var(--a-pu); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .adm-live-dot { animation: none; } }

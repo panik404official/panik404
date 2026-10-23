@@ -18,7 +18,7 @@ from ..config import Settings
 from ..mailer import Attachment, Mail, MailNotConfigured, send_mail
 from ..models import ConsentForm
 from ..notify import notify, users_who_can
-from ..repos import consent as repo
+from ..repos import consent as repo, meetings as meetings_repo
 from ..schemas import ConsentData
 from ..security import limit
 
@@ -70,6 +70,9 @@ async def submit(body: ConsentData, token: Token, request: Request, background: 
                      title=f"{who}'s consent form is ready for you",
                      body=f"{who} filled the consent form assigned to you. Review it and add your signature.",
                      link=link)
+        # Saved and already assigned: create the Google Meet link and email it (after the response, so the
+        # client never waits on Google).
+        background.add_task(meetings_repo.sync_later, s, form.id)
     return repo.public_view(form)
 
 

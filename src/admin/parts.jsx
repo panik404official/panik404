@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from './api';
+import { KIND_LABEL } from './OrderList';
 import { EVENT_LABELS, Field, MILESTONES, Props, Status, day, device, money, short, time, when } from './ui';
 
 const DETAIL_LABELS = {
@@ -22,8 +23,12 @@ const DETAIL_LABELS = {
   partner_verification_id: 'Partner verification',
 };
 
+const HIDDEN_DETAILS = new Set(['receipt']); // shown as a picture by <ReceiptView>
+
 export function OrderDetails({ details }) {
-  const entries = Object.entries(details || {}).filter(([, v]) => v !== null && v !== '' && v !== undefined);
+  const entries = Object.entries(details || {}).filter(
+    ([k, v]) => !HIDDEN_DETAILS.has(k) && v !== null && v !== '' && v !== undefined,
+  );
   if (!entries.length) return null;
   return (
     <dl className="adm-fields">
@@ -41,6 +46,46 @@ export function OrderDetails({ details }) {
         </Field>
       ))}
     </dl>
+  );
+}
+
+/** The payment screenshot the customer uploaded (stored privately on Cloudinary; the URL is signed). */
+export function ReceiptView({ receipt }) {
+  const [big, setBig] = useState(false);
+  if (!receipt) return null;
+  if (!receipt.url)
+    return (
+      <div className="adm-receipt">
+        <h4>Payment receipt</h4>
+        <p className="adm-muted">
+          {receipt.filename ? `${receipt.filename} was emailed to the team` : 'The receipt was emailed to the team'}
+          {receipt.store_error ? ` but not stored for the panel (${receipt.store_error}).` : '. It was sent before receipts were stored in the panel.'}
+        </p>
+      </div>
+    );
+  return (
+    <div className="adm-receipt">
+      <h4>Payment receipt</h4>
+      {receipt.is_pdf ? (
+        <p>
+          <a className="adm-btn" href={receipt.url} target="_blank" rel="noreferrer">
+            Open PDF receipt
+          </a>{' '}
+          <small className="adm-muted">{receipt.filename}</small>
+        </p>
+      ) : (
+        <>
+          <button type="button" className={`adm-receipt-img${big ? ' big' : ''}`} onClick={() => setBig(!big)}
+            aria-label={big ? 'Show smaller' : 'Show larger'}>
+            <img src={big ? receipt.url : receipt.thumb_url || receipt.url} alt="Payment receipt uploaded by the customer" loading="lazy" />
+          </button>
+          <p className="adm-sub">
+            <a href={receipt.url} target="_blank" rel="noreferrer">Open full size</a>
+            {receipt.filename && <> · {receipt.filename}</>}
+          </p>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -93,7 +138,7 @@ export function OrderCard({ order, onChanged, linkTitle = true }) {
           {linkTitle ? <Link to={`/admin/orders/${order.id}`}>Order #{order.order_no}</Link> : `Order #${order.order_no}`}
         </h3>
         <Status value={order.status} />
-        <span className="adm-kind">{order.kind}</span>
+        <span className="adm-kind">{KIND_LABEL[order.kind] || order.kind}</span>
         <strong className="adm-total">{money(order.total, order.currency)}</strong>
       </header>
       <p className="adm-sub">
@@ -116,6 +161,7 @@ export function OrderCard({ order, onChanged, linkTitle = true }) {
         </table>
       </div>
       <OrderDetails details={order.details} />
+      <ReceiptView receipt={order.receipt} />
       {order.payments.length > 0 && (
         <>
           <h4>Payments</h4>

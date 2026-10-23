@@ -108,6 +108,43 @@ one is also emailed in the background (set `PANEL_URL` so the email links straig
    and the client. Admins get a notification that it was signed.
 An admin can send a saved form back to the client (`POST .../reopen`) or close the link (`POST .../revoke`).
 
+## Online sessions (Google Meet)
+Once a client has **saved** their consent form **and** an admin has **assigned a psychologist** (either order), the API
+creates a Google Calendar event with a Meet link on the Panik Google account, at the form's session time
+(read as `SESSION_TIMEZONE`, default Pakistan time, `SESSION_MINUTES` long, default 60). The client and the psychologist
+are guests; the client gets the link by email, the psychologist by panel notification + email. Changing the
+psychologist (or the client re-saving a new time) updates the same event and emails the new details; closing the
+consent link cancels it. If Google isn't connected or fails, admins get a notification and can retry or paste any link.
+
+Status moves on its own (`meetings` table, a clock in the API checks every `MEETING_TICK_SECONDS`, default 30):
+scheduled -> **live** at the start time -> **ended** at the end time. The psychologist can also press
+*Mark as started* / *Mark as ended*, and writes **feedback** once it has ended (admins can read it).
+Panel: **Sessions** (tabs *Online sessions* and *Booking requests*). Psychologists only see their own sessions.
+
+Endpoints: `GET /v1/admin/meetings` (`when`=upcoming|today|past, `status`=scheduled|live|ended|cancelled|needs_feedback|no_link,
+`mine`, `q`) · `GET .../{id}` · `POST .../{id}/start` · `POST .../{id}/end` · `POST .../{id}/feedback` ·
+admin only: `PATCH .../{id}` (`meet_url`, `starts_at`, `minutes`, `notify`) · `POST .../{id}/regenerate` ·
+`POST .../{id}/resend` · `POST .../{id}/cancel`.
+
+### Connecting Google (once)
+1. Google Cloud console: create a project, enable the **Google Calendar API**.
+2. OAuth consent screen: External, add the scope `.../auth/calendar.events`, then **Publish app** ("In production").
+   Left in "Testing", Google expires the connection after 7 days.
+3. Credentials -> Create OAuth client ID -> **Desktop app**. Put the ID and secret in `.env` as `GOOGLE_CLIENT_ID` /
+   `GOOGLE_CLIENT_SECRET`.
+4. `python scripts/google_auth.py`, sign in with the Panik account (the one whose calendar holds the sessions), allow.
+   Paste the printed `GOOGLE_REFRESH_TOKEN` into `.env` and restart.
+`GOOGLE_SEND_INVITES=true` also has Google email calendar invitations (adds the session to their calendars).
+Guests signed in to Google with the invited email join straight away; anyone else "asks to join", which only the
+organizer (the Panik account) can approve on a personal Gmail account. A Google Workspace account avoids that.
+
+## Payment receipts (Cloudinary)
+Gift and booking receipts are uploaded to Cloudinary as `authenticated` (private) files and shown on the order page
+through a signed URL. Set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` (or `CLOUDINARY_URL`).
+If Cloudinary is down or not set up, the request still succeeds (the receipt is emailed as before) and the panel says
+it wasn't stored. Orders placed before this change only have the emailed copy.
+The panel's **Orders** page now shows journals and gift vouchers; session bookings are under **Sessions**.
+
 ## Admin panel
 Open the site at `#/admin` (e.g. `http://localhost:5173/#/admin`) and enter `ADMIN_API_KEY`. The key is kept in
 sessionStorage only. Pages: overview, customers (search, sort, CSV export), a full customer profile (contact details,

@@ -3,7 +3,7 @@ export const PERMISSIONS = [
   ['consent_assigned', 'Consent forms assigned to them (view and sign)'],
   ['consent_manage', 'All consent forms (create links, assign psychologists, close links)'],
   ['overview', 'Overview and analytics'],
-  ['orders', 'Orders'],
+  ['orders', 'Orders and session bookings'],
   ['customers', 'Customers'],
   ['visitors', 'Visitors and live activity'],
   ['partners', 'Partner bookings (Ibex)'],

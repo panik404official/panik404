@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ValidationError
 
+from .. import cloud
 from ..config import Settings
 from ..mailer import Attachment, Mail, MailNotConfigured, send_mail
 from ..models import Order, PartnerVerification
@@ -78,11 +79,26 @@ async def _send(s: Settings, kind: str, *mails: Mail) -> None:
         raise HTTPException(502, "We could not send the email. Please try again later.") from e
 
 
-async def _mark_submitted(order: Order, receipt: Attachment, coupon: str | None) -> None:
+async def _store_receipt(s: Settings, order: Order, receipt: Attachment) -> dict:
+    """Uploads the receipt to Cloudinary so the panel can show it. Best effort: if storage is down or not set up,
+    the request still goes through (the team gets the receipt by email either way)."""
+    meta = {"filename": receipt.filename, "content_type": receipt.mime, "bytes": len(receipt.content)}
+    try:
+        meta["stored"] = await cloud.upload_receipt(s, receipt.content, receipt.mime, f"order-{order.order_no}")
+    except cloud.StorageNotConfigured:
+        log.warning("receipt for order #%s not stored: Cloudinary is not configured", order.order_no)
+        meta["store_error"] = "Cloudinary is not configured"
+    except Exception as e:  # noqa: BLE001 - never lose the booking because the image host failed
+        log.exception("receipt upload failed for order #%s", order.order_no)
+        meta["store_error"] = str(e)[:200] or e.__class__.__name__
+    return meta
+
+
+async def _mark_submitted(order: Order, receipt: dict, coupon: str | None) -> None:
     order.details = {
         **order.details,
         "request_submitted_at": datetime.now(timezone.utc).isoformat(),
-        "receipt": {"filename": receipt.filename, "content_type": receipt.mime, "bytes": len(receipt.content)},
+        "receipt": receipt,
         "coupon": coupon or None,
     }
     await order.save(update_fields=["details", "updated_at"])
@@ -144,8 +160,9 @@ async def gift_request(request: Request, data: str = Form(...), receipt: UploadF
         ]),
         attachments=admin_attachments,
     ))
+    stored = await _store_receipt(s, order, proof)
     await _send(s, "gift", *mails)
-    await _mark_submitted(order, proof, body.coupon)
+    await _mark_submitted(order, stored, body.coupon)
     return {"message": "Gift request sent.", "order_no": order.order_no}
 
 
@@ -202,6 +219,7 @@ async def booking_request(request: Request, data: str = Form(...), receipt: Uplo
             "now. Do not wait for an email reply.",
         ]),
     )
+    stored = await _store_receipt(s, order, proof)
     await _send(s, "booking", admin, customer)
-    await _mark_submitted(order, proof, None if d.get("partner") else body.coupon)
+    await _mark_submitted(order, stored, None if d.get("partner") else body.coupon)
     return {"message": "Booking request sent.", "order_no": order.order_no}

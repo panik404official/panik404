@@ -291,3 +291,44 @@ class Notification(Model):
 
     class Meta:
         table = "notifications"
+
+
+class Meeting(Model):
+    """The online session for a consent form: a Google Meet link on the Panik calendar, created once the client
+    has saved the form and an admin has chosen the psychologist. Both get the link by email.
+
+    status: scheduled -> live (automatically at the start time, or when the psychologist presses Start)
+            -> ended (automatically at the end time, or when the psychologist presses End); cancelled when the
+            form's link is closed or an admin cancels it. After it ends, the psychologist can add feedback.
+    """
+
+    id = fields.UUIDField(primary_key=True)
+    consent_form = fields.OneToOneField("models.ConsentForm", related_name="meeting", on_delete=fields.CASCADE)
+    psychologist = fields.ForeignKeyField("models.User", related_name="meetings", null=True,
+                                          on_delete=fields.SET_NULL)
+    client_name = fields.CharField(max_length=200, null=True)
+    client_email = fields.CharField(max_length=320, null=True)
+    starts_at = fields.DatetimeField(db_index=True)
+    ends_at = fields.DatetimeField()
+    time_set_by_admin = fields.BooleanField(default=False)  # rescheduled in the panel: ignore the form's time
+    status = fields.CharField(max_length=16, default="scheduled", db_index=True)
+    meet_url = fields.CharField(max_length=300, null=True)
+    link_source = fields.CharField(max_length=16, null=True)  # google | manual
+    calendar_event_id = fields.CharField(max_length=200, null=True)
+    link_error = fields.CharField(max_length=500, null=True)
+    syncing_at = fields.DatetimeField(null=True)  # claim while a Google call is in flight
+    invited_at = fields.DatetimeField(null=True)  # last time the client + psychologist were emailed the link
+    started_at = fields.DatetimeField(null=True)
+    started_how = fields.CharField(max_length=16, null=True)  # auto | manual
+    ended_at = fields.DatetimeField(null=True)
+    ended_how = fields.CharField(max_length=16, null=True)  # auto | manual
+    cancelled_at = fields.DatetimeField(null=True)
+    feedback = fields.TextField(null=True)
+    feedback_at = fields.DatetimeField(null=True)
+    feedback_by = fields.ForeignKeyField("models.User", related_name="meeting_feedback", null=True,
+                                         on_delete=fields.SET_NULL)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "meetings"

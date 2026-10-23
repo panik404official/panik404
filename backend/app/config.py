@@ -48,9 +48,42 @@ class Settings(BaseSettings):
     mail_tls: bool = True
     receipt_max_bytes: int = 5 * 1024 * 1024
 
+    # Cloudinary: where payment receipts are stored so the panel can show them. Either the three values,
+    # or CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name> (Cloudinary dashboard -> API Keys).
+    cloudinary_url: str | None = None
+    cloudinary_cloud_name: str | None = None
+    cloudinary_api_key: str | None = None
+    cloudinary_api_secret: str | None = None
+    cloudinary_folder: str = "panik/receipts"
+
+    # Google Calendar / Meet: a Meet link is created on the Panik Google account's calendar for every session.
+    # Get the refresh token once with:  python scripts/google_auth.py   (see README, "Google Meet").
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    google_refresh_token: str | None = None
+    google_calendar_id: str = "primary"
+    google_send_invites: bool = True  # Google also emails calendar invitations to the client and psychologist
+    session_minutes: int = 60  # length of a session (Meet event and automatic "ended")
+    session_timezone: str = "Asia/Karachi"  # the consent form's session time is entered in this zone
+    meeting_tick_seconds: int = 30  # how often scheduled sessions are moved to live / ended
+
     @property
     def cors_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def cloudinary_creds(self) -> tuple[str, str, str] | None:
+        """(cloud_name, api_key, api_secret) or None when receipt storage isn't set up."""
+        name, key, secret = self.cloudinary_cloud_name, self.cloudinary_api_key, self.cloudinary_api_secret
+        if self.cloudinary_url and self.cloudinary_url.startswith("cloudinary://"):
+            from urllib.parse import urlsplit
+            u = urlsplit(self.cloudinary_url)
+            name, key, secret = u.hostname or name, u.username or key, u.password or secret
+        return (name, key, secret) if name and key and secret else None
+
+    @property
+    def google_ready(self) -> bool:
+        return bool(self.google_client_id and self.google_client_secret and self.google_refresh_token)
 
     @property
     def migration_url(self) -> str:

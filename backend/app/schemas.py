@@ -348,3 +348,17 @@ class StatusUpdate(Strict):
 class DateRange(BaseModel):
     start: datetime
     end: datetime
+
+
+class MeetingEdit(Strict):
+    """Admin changes to a session: paste a meeting link by hand, or reschedule. Times without an offset are read
+    in SESSION_TIMEZONE (Pakistan time)."""
+
+    meet_url: str | None = Field(None, max_length=300)
+    starts_at: datetime | None = None
+    minutes: int | None = Field(None, ge=15, le=240)
+    notify: bool = True  # email the client and psychologist the new details
+
+
+class MeetingFeedback(Strict):
+    feedback: str = Field(min_length=1, max_length=5000)

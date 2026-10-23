@@ -15,6 +15,7 @@ from .db import tortoise_config
 from .ingest import IngestBuffer
 from .models import Notification
 from .routers import admin, auth, consent, contact, health, intake, orders, partners, track, users
+from .repos import meetings as meetings_repo
 from .security import RateLimiter
 
 log = logging.getLogger("app")
@@ -33,6 +34,18 @@ async def _maintain_partitions() -> None:
         await asyncio.sleep(6 * 3600)
 
 
+async def _meeting_clock(s) -> None:
+    """Sessions start and end on their own: scheduled -> live at the start time, live -> ended at the end."""
+    while True:
+        try:
+            ended = await meetings_repo.tick(s)
+            if ended:
+                await meetings_repo.after_tick(s, ended)
+        except Exception:  # noqa: BLE001
+            log.exception("meeting clock failed")
+        await asyncio.sleep(s.meeting_tick_seconds)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     s = get_settings()
@@ -42,6 +55,7 @@ async def lifespan(app: FastAPI):
     buffer = IngestBuffer(s.track_queue_size, s.track_flush_batch, s.track_flush_interval)
     await buffer.start()
     maint = asyncio.create_task(_maintain_partitions(), name="partition-maintenance")
+    clock = asyncio.create_task(_meeting_clock(s), name="meeting-clock")
     app.state.settings, app.state.buffer = s, buffer
     app.state.limiters = {"track": RateLimiter(s.rate_limit_track_per_min),
                           "orders": RateLimiter(s.rate_limit_orders_per_min),
@@ -52,9 +66,10 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        maint.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await maint
+        for task in (maint, clock):
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
         await buffer.stop()  # flush what is still queued before closing connections
         await Tortoise.close_connections()
 

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAdmin, useMe } from '../ctx';
 import { ConsentState, CopyButton, consentLink, emailLinkHref } from '../consentUtil';
+import { MeetingState } from '../meetingUtil';
 import { fmtDT } from '../../consent/pdf';
 import { Empty, Loader, SearchBox, ago, when } from '../ui';
 
@@ -239,7 +240,15 @@ export default function ConsentForms() {
                           {(f.client_email || f.note) && <small>{f.client_email || f.note}</small>}
                         </Link>
                       </td>
-                      <td>{fmtDT(f.session_time) || '—'}</td>
+                      <td>
+                        {fmtDT(f.session_time) || '—'}
+                        {f.meeting && (
+                          <small className="block">
+                            <MeetingState m={f.meeting} />
+                            {!f.meeting.meet_url && f.meeting.status === 'scheduled' && <b className="adm-warn"> no link</b>}
+                          </small>
+                        )}
+                      </td>
                       <td>
                         <ConsentState form={f} />
                         {f.state === 'open' && f.expires_at && <small className="block">link until {when(f.expires_at)}</small>}

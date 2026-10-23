@@ -156,7 +156,8 @@ def test_consent_flow_notifies_admin_then_psychologist(client, boss, mails):
     assert client.post(f"/v1/admin/consent-forms/{f['id']}/sign", json=sign, headers=bearer(ot)).status_code == 404
     r = client.post(f"/v1/admin/consent-forms/{f['id']}/sign", json=sign, headers=bearer(pt))
     assert r.status_code == 200 and r.json()["state"] == "completed"
-    assert unread(client, at) == 2  # the admin hears it was signed
+    # the admin hears it was signed (+1: Google Meet isn't connected in tests, so admins are told the link is missing)
+    assert unread(client, at) == 3
 
     # marking read
     nid = client.get("/v1/admin/notifications", headers=bearer(pt)).json()["items"][0]["id"]

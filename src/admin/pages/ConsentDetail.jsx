@@ -7,6 +7,42 @@ import { buildPdf, fmtDate, fmtDT, saveBlob, slug } from '../../consent/pdf';
 import SigPad from '../../consent/SigPad';
 import '../../consent/consent.css';
 import { Field, Loader, download, when } from '../ui';
+import { MeetLink, MeetingState, sessionRelative, sessionWhen } from '../meetingUtil';
+
+function SessionPanel({ f, manage }) {
+  const m = f.meeting;
+  if (!m)
+    return (
+      <section className="adm-panel">
+        <h2>Online session</h2>
+        <p className="adm-muted">
+          {f.state === 'revoked' || f.state === 'expired'
+            ? 'No session: this link is closed.'
+            : !f.assigned_to && f.state === 'submitted'
+              ? 'Assign a psychologist and the Google Meet link is created and emailed to them and the client.'
+              : f.state === 'open'
+                ? 'The Google Meet link is created once the client saves the form and a psychologist is assigned.'
+                : 'The Google Meet link is being created. Reload in a moment.'}
+        </p>
+      </section>
+    );
+  return (
+    <section className={`adm-panel${m.status === 'live' ? ' adm-live-panel' : ''}${manage && !m.meet_url && m.status === 'scheduled' ? ' adm-attention' : ''}`}>
+      <h2>
+        Online session <MeetingState m={m} />
+      </h2>
+      <p>
+        {sessionWhen(m)}
+        {sessionRelative(m) && <small className="block adm-muted">{sessionRelative(m)}</small>}
+      </p>
+      <MeetLink m={m} />
+      {m.invited_at && <p className="adm-sub">Link emailed to the client and psychologist {when(m.invited_at)}.</p>}
+      <Link className="adm-btn" to={`/admin/sessions/${m.id}`}>
+        {m.status === 'ended' && !m.has_feedback ? 'Open session and add feedback' : 'Open session'}
+      </Link>
+    </section>
+  );
+}
 
 function AssignPanel({ f, onDone }) {
   const { data } = useAdmin('/psychologists');
@@ -18,7 +54,16 @@ function AssignPanel({ f, onDone }) {
     setMsg({});
     try {
       const r = await api(`/consent-forms/${f.id}/assign`, { method: 'POST', body: { user_id: pick || null } });
-      setMsg({ ok: r.assigned_to ? `Assigned to ${r.assigned_to.name}. They’ve been notified.` : 'Unassigned.' });
+      const m = r.meeting;
+      setMsg({
+        ok: !r.assigned_to
+          ? 'Unassigned.'
+          : m?.meet_url && m.status === 'scheduled'
+            ? `Assigned to ${r.assigned_to.name}. The Google Meet link was emailed to them and the client.`
+            : m?.link_error
+              ? `Assigned to ${r.assigned_to.name}, but the Meet link couldn’t be created: ${m.link_error}`
+              : `Assigned to ${r.assigned_to.name}. They’ve been notified.`,
+      });
       onDone();
     } catch (e) {
       setMsg({ err: e.message });
@@ -294,6 +339,7 @@ export default function ConsentDetail() {
               </section>
             </div>
             <div>
+            <SessionPanel f={f} manage={manage} />
             {manage && f.status !== 'completed' && f.status !== 'revoked' && <AssignPanel f={f} onDone={reload} />}
             {(!manage || f.status === 'completed' || f.status === 'revoked') && f.assigned_to && (
               <section className="adm-panel">

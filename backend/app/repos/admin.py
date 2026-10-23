@@ -12,6 +12,8 @@ from uuid import UUID
 from tortoise import connections
 from tortoise.expressions import Q
 
+from .. import cloud
+from ..config import get_settings
 from ..models import ContactMessage, Customer, Event, Lead, Order, Payment, Product, Session, Visitor
 
 CUSTOMER_SORTS = {
@@ -91,12 +93,27 @@ async def list_customers(q: str | None, sort: str, limit: int, offset: int) -> d
     return {"items": rows, "total": total, "limit": limit, "offset": offset}
 
 
+def receipt_view(details: dict | None) -> dict | None:
+    """The uploaded payment receipt with a freshly signed URL (the stored asset is not public)."""
+    r = (details or {}).get("receipt")
+    if not isinstance(r, dict):
+        return None
+    s = get_settings()
+    stored = r.get("stored")
+    is_pdf = r.get("content_type") == "application/pdf"
+    return {"filename": r.get("filename"), "content_type": r.get("content_type"), "bytes": r.get("bytes"),
+            "is_pdf": is_pdf, "url": cloud.signed_url(s, stored),
+            "thumb_url": None if is_pdf else cloud.signed_url(s, stored, thumb=True),
+            "stored": bool(stored), "store_error": r.get("store_error")}
+
+
 def _order_dict(o: Order) -> dict:
     return {
         "id": o.id, "order_no": o.order_no, "kind": o.kind, "status": o.status, "currency": o.currency,
         "subtotal": o.subtotal, "discount": o.discount, "total": o.total, "details": o.details,
         "created_at": o.created_at, "paid_at": o.paid_at, "updated_at": o.updated_at,
         "visitor_id": o.visitor_id, "session_id": o.session_id, "idempotency_key": o.idempotency_key,
+        "receipt": receipt_view(o.details),
         "items": [{"line_no": i.line_no, "product_id": i.product_id, "name": i.name, "unit_price": i.unit_price,
                    "quantity": i.quantity, "line_total": i.unit_price * i.quantity}
                   for i in sorted(o.items, key=lambda i: i.line_no)],
@@ -184,13 +201,18 @@ async def order_detail(order_id: UUID) -> dict | None:
     return data
 
 
+ORDER_GROUPS = {"sessions": ["booking"], "shop": ["product", "gift"]}  # panel sections
+
+
 async def search_orders(status: str | None, kind: str | None, q: str | None, before: datetime | None,
-                        limit: int) -> list[dict]:
+                        limit: int, group: str | None = None) -> list[dict]:
     qs = Order.all()
     if status:
         qs = qs.filter(status=status)
     if kind:
         qs = qs.filter(kind=kind)
+    if group:
+        qs = qs.filter(kind__in=ORDER_GROUPS[group])
     if before:
         qs = qs.filter(created_at__lt=before)
     if q and q.strip():
@@ -199,10 +221,18 @@ async def search_orders(status: str | None, kind: str | None, q: str | None, bef
         if term.isdigit():
             cond |= Q(order_no=int(term))
         qs = qs.filter(cond)
-    return await (qs.order_by("-created_at").limit(limit)
+    rows = await (qs.order_by("-created_at").limit(limit)
                   .values("id", "order_no", "kind", "status", "total", "currency", "created_at", "paid_at",
-                          "visitor_id", "customer_id", email="customer__email", name="customer__name",
+                          "visitor_id", "customer_id", "details", email="customer__email", name="customer__name",
                           phone="customer__phone"))
+    for r in rows:  # keep the list light: only what the tables show
+        d = r.pop("details") or {}
+        rec = d.get("receipt") if isinstance(d.get("receipt"), dict) else None
+        r["receipt"] = ("stored" if rec.get("stored") else "emailed") if rec else None
+        r["preferred_date"], r["preferred_time"] = d.get("preferred_date"), d.get("preferred_time")
+        r["partner_name"] = d.get("partner_name")
+        r["recipient"] = d.get("recipient")
+    return rows
 
 
 # ---- visitors, leads, live activity -------------------------------------------------------------------

@@ -7,6 +7,8 @@ import Overview from './pages/Overview';
 import Customers from './pages/Customers';
 import CustomerProfile from './pages/CustomerProfile';
 import Orders from './pages/Orders';
+import Sessions from './pages/Sessions';
+import SessionDetail from './pages/SessionDetail';
 import OrderDetail from './pages/OrderDetail';
 import Visitors from './pages/Visitors';
 import VisitorJourney from './pages/VisitorJourney';
@@ -28,6 +30,7 @@ const NAV = [
   ['/admin', 'Overview', 'overview', true],
   ['/admin/consent', 'Consent forms', ['consent_manage', 'consent_assigned']],
   ['/admin/customers', 'Customers', 'customers'],
+  ['/admin/sessions', 'Sessions', ['consent_manage', 'consent_assigned', 'orders']],
   ['/admin/orders', 'Orders', 'orders'],
   ['/admin/visitors', 'Visitors', 'visitors'],
   ['/admin/activity', 'Live activity', 'visitors'],
@@ -199,6 +202,8 @@ export default function AdminApp() {
             <Route path="/admin" element={can('overview') ? <Overview /> : <Navigate to={home} replace />} />
             <Route path="/admin/customers" element={guard('customers', <Customers />)} />
             <Route path="/admin/customers/:id" element={guard('customers', <CustomerProfile />)} />
+            <Route path="/admin/sessions" element={guard(['consent_manage', 'consent_assigned', 'orders'], <Sessions />)} />
+            <Route path="/admin/sessions/:id" element={guard(['consent_manage', 'consent_assigned'], <SessionDetail />)} />
             <Route path="/admin/orders" element={guard('orders', <Orders />)} />
             <Route path="/admin/orders/:id" element={guard('orders', <OrderDetail />)} />
             <Route path="/admin/visitors" element={guard('visitors', <Visitors />)} />
