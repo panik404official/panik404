@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from '../components/Link';
-import { createOrder, track } from '../utils/tracker';
+import { CouponField } from '../components/Payment';
+import { couponOff, createOrder, track } from '../utils/tracker';
 import { isValidEmail } from '../utils/validation';
 
 export default function Cart({ cart, setCart }) {
@@ -10,7 +11,9 @@ export default function Cart({ cart, setCart }) {
     [er, setEr] = useState({}),
     [sending, setSending] = useState(false),
     [submitError, setSubmitError] = useState(''),
-    [order, setOrder] = useState(null);
+    [order, setOrder] = useState(null),
+    [coupon, setCoupon] = useState(null); // the applied coupon from the server
+  const off = couponOff(coupon, tot);
   // One key per checkout attempt: retries of the same cart must not create a second order.
   const idemKey = useRef(null);
   useEffect(() => {
@@ -46,11 +49,13 @@ export default function Cart({ cart, setCart }) {
             phone: customer.phone.trim(),
           },
           items: cart.map((c) => ({ product_id: c.id, quantity: c.q })),
+          ...(coupon ? { coupon: coupon.code } : {}),
         },
         idemKey.current,
       );
       setOrder(result);
       setCart([]);
+      setCoupon(null);
     } catch (error) {
       setSubmitError(error.message || 'Unable to place your order. Please try again.');
     } finally {
@@ -127,12 +132,21 @@ export default function Cart({ cart, setCart }) {
               </span>
             </div>
           ))}
-          <h3>Total: ₨ {tot.toLocaleString()}</h3>
+          <h3>
+            Total: ₨ {(tot - off).toLocaleString()}
+            {off > 0 && (
+              <>
+                {' '}
+                <s style={{ fontWeight: 400 }}>₨ {tot.toLocaleString()}</s>
+              </>
+            )}
+          </h3>
           {checkingOut ? (
             <>
               {field('name', 'Name *')}
               {field('email', 'Email Address *', 'email')}
               {field('phone', 'Phone Number/Whatsapp *', 'tel')}
+              <CouponField kind="product" coupon={coupon} onCoupon={setCoupon} idPrefix="cart" />
               <div style={{ marginTop: 16 }}>
                 <button className="btn pu" disabled={sending} onClick={placeOrder}>
                   {sending ? 'Placing order…' : 'Place order'}

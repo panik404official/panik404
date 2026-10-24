@@ -21,6 +21,7 @@ import ContactMessages from './pages/ContactMessages';
 import PartnerVerifications from './pages/PartnerVerifications';
 import PartnerVerificationDetail from './pages/PartnerVerificationDetail';
 import Users from './pages/Users';
+import Coupons from './pages/Coupons';
 import Account from './pages/Account';
 import Notifications from './pages/Notifications';
 import './admin.css';
@@ -38,6 +39,7 @@ const NAV = [
   ['/admin/messages', 'Contact messages', 'leads'],
   ['/admin/leads', 'Corporate leads', 'leads'],
   ['/admin/catalogue', 'Products & payments', 'catalogue'],
+  ['/admin/coupons', 'Coupons', 'admin'],
   ['/admin/users', 'Users', 'admin'],
 ];
 
@@ -216,6 +218,7 @@ export default function AdminApp() {
             <Route path="/admin/partners/:id" element={guard('partners', <PartnerVerificationDetail />)} />
             <Route path="/admin/consent" element={guard(['consent_manage', 'consent_assigned'], <ConsentForms />)} />
             <Route path="/admin/consent/:id" element={guard(['consent_manage', 'consent_assigned'], <ConsentDetail />)} />
+            <Route path="/admin/coupons" element={guard('admin', <Coupons />)} />
             <Route path="/admin/users" element={guard('admin', <Users />)} />
             <Route path="/admin/account" element={<Account />} />
             <Route path="/admin/notifications" element={<Notifications />} />

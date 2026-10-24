@@ -80,7 +80,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Panik API", version="1.0.0", lifespan=lifespan,
                   docs_url=None if prod else "/docs", redoc_url=None, openapi_url=None if prod else "/openapi.json")
 
-    app.add_middleware(CORSMiddleware, allow_origins=s.cors_list, allow_methods=["GET", "POST", "PATCH"],
+    app.add_middleware(CORSMiddleware, allow_origins=s.cors_list, allow_methods=["GET", "POST", "PATCH", "DELETE"],
                        allow_headers=["Content-Type", "Idempotency-Key", "X-Admin-Key", "Authorization"],
                        expose_headers=[UNREAD_HEADER], max_age=600)
 

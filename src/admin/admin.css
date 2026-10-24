@@ -290,3 +290,10 @@ iframe.adm-doc { height: 70vh; }
 .adm-receipt-img img { display: block; width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; }
 .adm-receipt-img:focus-visible { outline: 3px solid var(--a-pu); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .adm-live-dot { animation: none; } }
+
+/* coupons */
+.adm-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.03em; }
+.adm-kinds { grid-column: 1 / -1; display: flex; gap: 8px 20px; flex-wrap: wrap; align-items: center; }
+.adm-kinds > span { font-size: 0.85rem; font-weight: 700; color: var(--a-mute); flex-basis: 100%; }
+.adm .adm-form-grid .adm-kinds label { flex-direction: row; align-items: center; gap: 8px; font-weight: 400; font-size: 0.95rem; color: var(--a-ink); cursor: pointer; }
+.adm .adm-form-grid .adm-kinds input { width: auto; margin: 0; }

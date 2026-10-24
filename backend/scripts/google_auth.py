@@ -48,7 +48,7 @@ def main() -> None:
     if not a.client_id or not a.client_secret:
         sys.exit("Give --client-id and --client-secret (or set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env).")
 
-    redirect = f"http://localhost:{a.port}/"
+    redirect = f"http://127.0.0.1:{a.port}/"
     state = secrets.token_urlsafe(16)
     got: dict[str, str] = {}
 

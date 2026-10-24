@@ -66,10 +66,11 @@ export default function Gift() {
         delivery: how,
         ...(how === 'email' ? { recipient_email: to.trim() } : { address: to.trim() }),
         message: msg.trim().slice(0, 500) || null,
+        ...(coupon ? { coupon } : {}),
       },
       idemKey.current,
     );
-    await sendGiftRequest(order.id, { coupon }, receipt);
+    await sendGiftRequest(order.id, {}, receipt);
     return order;
   };
   // After a successful request, start fresh so the same gift is not sent twice.

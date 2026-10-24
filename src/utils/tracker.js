@@ -123,6 +123,23 @@ export const sendBookingRequest = (orderId, fields, receipt) =>
 export const createOrder = (payload, idempotencyKey = crypto.randomUUID()) =>
   post('/v1/orders', payload, { 'Idempotency-Key': idempotencyKey });
 export const createLead = (payload) => post('/v1/leads', payload);
+/** Checks a coupon for the Apply button. kind: booking | gift | product. The server prices the order again. */
+export async function checkCoupon(code, kind) {
+  const res = await fetch(`${API}/v1/coupons/check`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, kind }),
+  });
+  if (!res.ok) throw new Error(errorText((await res.json().catch(() => ({}))).detail, res.status));
+  return res.json();
+}
+/** Rupees a checked coupon takes off `amount` (the same rounding the server uses). */
+export function couponOff(coupon, amount) {
+  if (!coupon) return 0;
+  const v = Number(coupon.value);
+  const off = coupon.discount_type === 'percent' ? Math.round((amount * v) / 100) : Math.round(v);
+  return Math.min(Math.max(amount, 0), off);
+}
 /** Partner programme name and discount, from the server. */
 export async function getPartner(slug) {
   const res = await fetch(`${API}/v1/partners/${encodeURIComponent(slug)}`);

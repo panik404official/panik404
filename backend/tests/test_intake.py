@@ -53,7 +53,7 @@ def test_gift_request_emails_team_and_recipient(client, ids, sent):
     assert recipient.to == "ayesha@example.com" and recipient.attachments[0].content.startswith(b"%PDF-")
 
     details = q("SELECT details FROM orders WHERE id = $1", uuid.UUID(o["id"]))[0]["details"]
-    assert details["request_submitted_at"] and details["coupon"] == "SPRING"
+    assert details["request_submitted_at"] and details["coupon_typed"] == "SPRING" and "coupon" not in details
     assert details["receipt"]["content_type"] == "image/png"
 
     again = submit(client, "/v1/gifts/request", {"order_id": o["id"]})

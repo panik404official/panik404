@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { PaymentInstructions, ReceiptUpload, checkReceipt } from './Payment';
 import { fmt } from '../utils/format';
+import { couponOff } from '../utils/tracker';
 
 /* Payment + receipt steps for a gift, shown over the gift builder so the live preview stays in view.
    onSubmit({ coupon, receipt }) must create the order, send the request and resolve with the order. */
 export default function GiftCheckoutDialog({ open, amount, sessions, who, onSubmit, onClose, onDone }) {
   const ref = useRef(null);
   const [step, setStep] = useState(1),
-    [coupon, setCoupon] = useState(''),
+    [coupon, setCoupon] = useState(null), // the applied coupon from the server
     [receipt, setReceipt] = useState(null),
     [receiptError, setReceiptError] = useState(''),
     [sending, setSending] = useState(false),
@@ -39,7 +40,7 @@ export default function GiftCheckoutDialog({ open, amount, sessions, who, onSubm
     setSending(true);
     setSubmitError('');
     try {
-      setOrder(await onSubmit({ coupon: coupon.trim(), receipt }));
+      setOrder(await onSubmit({ coupon: coupon?.code || null, receipt }));
       setStep(3);
     } catch (e) {
       setSubmitError(e.message || 'Unable to send the gift request. Please try again.');
@@ -76,7 +77,8 @@ export default function GiftCheckoutDialog({ open, amount, sessions, who, onSubm
             </div>
             <p className="checkout-summary">
               {sessions} session{sessions > 1 ? 's' : ''} for <b>{who.trim() || 'your friend'}</b> ·{' '}
-              <b>{fmt(amount)}</b>
+              <b>{fmt(amount - couponOff(coupon, amount))}</b>
+              {coupon && <> ({coupon.code})</>}
             </p>
           </>
         )}
@@ -85,6 +87,7 @@ export default function GiftCheckoutDialog({ open, amount, sessions, who, onSubm
           <PaymentInstructions
             idPrefix="gift"
             amount={amount}
+            kind="gift"
             purpose={`${sessions} gift session${sessions > 1 ? 's' : ''}`}
             confirmation="The gift will be confirmed once your payment has been verified."
             coupon={coupon}

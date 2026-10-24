@@ -80,7 +80,8 @@ const query = (params) =>
 
 /** /v1/admin/... */
 export async function api(path, { params, ...opts } = {}) {
-  return (await request(`${API}/v1/admin${path}${query(params)}`, opts)).json();
+  const res = await request(`${API}/v1/admin${path}${query(params)}`, opts);
+  return res.status === 204 ? null : res.json();
 }
 /** /v1/auth/... */
 export async function authApi(path, opts = {}) {

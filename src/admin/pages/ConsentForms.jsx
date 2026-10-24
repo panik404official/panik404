@@ -32,8 +32,8 @@ const EXPIRY = [
 ];
 const BLANK = { note: '', name: '', email: '', session_time: '', assign_to: '', expires: 7 };
 
-function NewLink({ onCreated, onCancel }) {
-  const [f, setF] = useState(BLANK);
+export function NewLink({ onCreated, onCancel, initial = {} }) {
+  const [f, setF] = useState({ ...BLANK, ...initial });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -44,7 +44,7 @@ function NewLink({ onCreated, onCancel }) {
     setErr('');
     try {
       const prefill = Object.fromEntries(
-        ['name', 'email', 'session_time'].map((k) => [k, f[k].trim()]).filter(([, v]) => v),
+        ['name', 'email', 'phone', 'session_time'].map((k) => [k, (f[k] || '').trim()]).filter(([, v]) => v),
       );
       const form = await api('/consent-forms', {
         method: 'POST',
@@ -122,7 +122,7 @@ function NewLink({ onCreated, onCancel }) {
   );
 }
 
-function Created({ form, onClose }) {
+export function Created({ form, onClose }) {
   const link = consentLink(form.token);
   return (
     <div className="adm-panel adm-created" role="status">

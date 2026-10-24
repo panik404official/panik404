@@ -10,6 +10,7 @@ from tortoise.transactions import in_transaction
 from ..models import Customer, Event, Lead, Order, OrderItem, Payment, PartnerVerification, Product, Visitor
 from ..partners import BOOKING_NOTICE_GRACE, MIN_BOOKING_NOTICE, PARTNERS, VERIFICATION_MAX_AGE
 from ..schemas import BookingOrder, CustomerIn, GiftOrder, LeadIn, ProductOrder
+from . import coupons as coupons_repo
 from .tracking import Ctx, ensure_visitor_session
 
 CENT = Decimal("0.01")
@@ -137,7 +138,20 @@ async def create_order(body, ctx: Ctx, idem_key: str | None) -> tuple[Order, boo
             now = datetime.now(timezone.utc)
             await ensure_visitor_session(body.visitor_id, body.session_id, ctx, now)
             lines, subtotal, discount, details = await _price(body)
-            total = subtotal - discount
+            coupon = None
+            if coupons_repo.normalize(body.coupon):
+                if details.get("partner"):
+                    raise OrderError(422, "Coupons can't be combined with the partner price.")
+                try:
+                    coupon = await coupons_repo.validate(body.coupon, body.kind)
+                except coupons_repo.CouponError as e:
+                    raise OrderError(e.status_code, e.message) from None
+                # The coupon comes off what's left after automatic discounts (e.g. the gift bundle discount).
+                off = coupons_repo.discount_for(coupon, subtotal - discount)
+                discount += off
+                details.update(coupon=coupon.code, coupon_id=str(coupon.id), coupon_label=coupons_repo.label(coupon),
+                               coupon_discount=str(off))
+            total = max(subtotal - discount, Decimal(0))
             customer = await _upsert_customer(body.customer)
             # Stitch the anonymous browsing history to this customer
             await Visitor.filter(id=body.visitor_id).update(customer_id=customer.id)
@@ -152,6 +166,11 @@ async def create_order(body, ctx: Ctx, idem_key: str | None) -> tuple[Order, boo
                 OrderItem(order_id=order.id, line_no=i, product_id=l["product_id"], name=l["name"],
                           unit_price=l["unit_price"], quantity=l["quantity"])
                 for i, l in enumerate(lines, 1)])
+            if coupon is not None:
+                try:
+                    await coupons_repo.claim(coupon, conn)
+                except coupons_repo.CouponError as e:
+                    raise OrderError(e.status_code, e.message) from None
             if vid := details.get("partner_verification_id"):
                 claimed = await PartnerVerification.filter(id=vid, order_id__isnull=True).update(
                     order_id=order.id, used_at=now)
@@ -196,6 +215,8 @@ async def set_status(order_id, status: str, provider: str | None, provider_ref: 
         if status == "paid":
             order.paid_at = order.paid_at or now
         await order.save(update_fields=["status", "paid_at", "updated_at"])
+        if status == "cancelled":  # final; a failed order can still go back to pending, so it keeps its use
+            await coupons_repo.release(order)
         if status in ("paid", "refunded"):
             await Payment.bulk_create(
                 [Payment(order_id=order.id, provider=provider or "manual",

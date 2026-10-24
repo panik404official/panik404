@@ -80,6 +80,7 @@ export default function BookingForm({ partner = null, prefill = {}, onDone }) {
           preferred_time: `${+f.hh}:${String(+f.mm).padStart(2, '0')} ${f.ampm}`,
           preferred_at: preferredMoment(f.date, f.hh, f.mm, f.ampm).toISOString(),
           ...(partner ? { partner_verification_id: partner.verificationId } : {}),
+          ...(!partner && f.coupon ? { coupon: f.coupon.code } : {}),
         },
         idemKey.current,
       );
@@ -99,7 +100,6 @@ export default function BookingForm({ partner = null, prefill = {}, onDone }) {
           treatment: f.treatment.trim(),
           notes: f.notes.trim(),
           consent: true,
-          coupon: partner ? null : f.coupon?.trim() || null,
         },
         f.file,
       );
@@ -307,6 +307,7 @@ export default function BookingForm({ partner = null, prefill = {}, onDone }) {
               amount={price}
               regularAmount={partner ? BOOKING_PRICE : undefined}
               showCoupon={!partner}
+              kind="booking"
               purpose="your 45-minute 1-on-1 online consultation (Google Meet)"
               confirmation="Your consultation will be scheduled after your payment has been successfully verified."
               coupon={f.coupon}

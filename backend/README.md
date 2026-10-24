@@ -145,6 +145,14 @@ If Cloudinary is down or not set up, the request still succeeds (the receipt is 
 it wasn't stored. Orders placed before this change only have the emailed copy.
 The panel's **Orders** page now shows journals and gift vouchers; session bookings are under **Sessions**.
 
+## Coupons
+Admins create codes on the panel's **Coupons** page (admins only; `/v1/admin/coupons`): % off or Rs off, which
+orders they work for (session bookings, gift vouchers, journals), an optional use limit, start date and last day.
+Customers press **Apply** at checkout (`POST /v1/coupons/check` previews it); the order is priced again on the server
+when it's placed (`coupon` on `POST /v1/orders`), after any bundle discount, never below zero, and not together with a
+partner price. A use is taken when the order is placed (safe under concurrency) and given back if it's cancelled.
+Used codes can only be switched off, not deleted. The order's details and the team email show the code and the saving.
+
 ## Admin panel
 Open the site at `#/admin` (e.g. `http://localhost:5173/#/admin`) and enter `ADMIN_API_KEY`. The key is kept in
 sessionStorage only. Pages: overview, customers (search, sort, CSV export), a full customer profile (contact details,

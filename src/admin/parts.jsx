@@ -16,6 +16,9 @@ const DETAIL_LABELS = {
   mode: 'Mode',
   request_submitted_at: 'Receipt submitted',
   coupon: 'Coupon',
+  coupon_label: 'Coupon discount',
+  coupon_discount: 'Saved with coupon (Rs)',
+  coupon_typed: 'Coupon typed (not valid, not applied)',
   preferred_at: 'Preferred start (with time zone)',
   partner: 'Partner',
   partner_name: 'Partner programme',
@@ -23,7 +26,7 @@ const DETAIL_LABELS = {
   partner_verification_id: 'Partner verification',
 };
 
-const HIDDEN_DETAILS = new Set(['receipt']); // shown as a picture by <ReceiptView>
+const HIDDEN_DETAILS = new Set(['receipt', 'coupon_id', 'coupon_released']); // shown as a picture by <ReceiptView>
 
 export function OrderDetails({ details }) {
   const entries = Object.entries(details || {}).filter(

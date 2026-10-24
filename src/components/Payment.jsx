@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { fmt } from '../utils/format';
+import { checkCoupon, couponOff } from '../utils/tracker';
 
 // Shared by the booking form (steps 5–6) and the gift checkout popup.
 export const RECEIPT_MAX_BYTES = 5 * 1024 * 1024;
@@ -13,36 +15,110 @@ export function checkReceipt(file) {
   return '';
 }
 
+/**
+ * Coupon input with Apply / Remove. `coupon` is the applied coupon from the server (or null);
+ * onCoupon(couponOrNull) reports changes. Only an applied coupon changes the price.
+ */
+export function CouponField({ kind, coupon, onCoupon, idPrefix }) {
+  const [text, setText] = useState(coupon?.code || '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const apply = async () => {
+    const code = text.trim();
+    if (!code) return;
+    setBusy(true);
+    setError('');
+    try {
+      const c = await checkCoupon(code, kind);
+      onCoupon(c);
+      setText(c.code);
+    } catch (e) {
+      onCoupon(null);
+      setError(e.message || 'This coupon code isn’t valid.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const pending = text.trim() && text.trim().toUpperCase() !== coupon?.code;
+  return (
+    <>
+      <label htmlFor={`${idPrefix}-coupon`}>Coupon code</label>
+      <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
+        <input
+          id={`${idPrefix}-coupon`}
+          maxLength={40}
+          value={text}
+          autoComplete="off"
+          style={{ textTransform: 'uppercase', marginBottom: 0 }}
+          onChange={(e) => {
+            setText(e.target.value);
+            setError('');
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              apply();
+            }
+          }}
+          aria-invalid={Boolean(error)}
+          aria-describedby={`${idPrefix}-coupon-msg`}
+        />
+        {coupon && !pending ? (
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={() => {
+              onCoupon(null);
+              setText('');
+            }}
+          >
+            Remove
+          </button>
+        ) : (
+          <button type="button" className="btn ghost" disabled={busy || !text.trim()} onClick={apply}>
+            {busy ? 'Checking…' : 'Apply'}
+          </button>
+        )}
+      </div>
+      <div id={`${idPrefix}-coupon-msg`} role="status" style={{ minHeight: '1.4em', marginTop: 4 }}>
+        {error ? (
+          <span className="err">{error}</span>
+        ) : coupon && !pending ? (
+          <small>
+            <b>{coupon.code}</b> applied: {coupon.label}.
+          </small>
+        ) : pending ? (
+          <small>Press Apply to use this code.</small>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
 export function PaymentInstructions({
   amount,
   regularAmount,
   purpose,
   confirmation,
+  kind,
   coupon,
   onCoupon,
   idPrefix,
   showCoupon = true,
 }) {
+  const off = showCoupon ? couponOff(coupon, amount) : 0;
+  const due = amount - off;
+  const was = off ? amount : regularAmount;
   return (
     <>
-      {showCoupon && (
-        <>
-          <label htmlFor={`${idPrefix}-coupon`}>Coupon Code/Employee ID</label>
-          <input
-            id={`${idPrefix}-coupon`}
-            maxLength={100}
-            value={coupon || ''}
-            onChange={(e) => onCoupon(e.target.value)}
-          />
-        </>
-      )}
+      {showCoupon && <CouponField kind={kind} coupon={coupon} onCoupon={onCoupon} idPrefix={idPrefix} />}
       <h3 style={{ fontSize: '1.2rem' }}>Payment Instructions</h3>
       <p>
-        Please transfer <b>{fmt(amount)}</b>
-        {regularAmount && regularAmount !== amount && (
+        Please transfer <b>{fmt(due)}</b>
+        {was && was !== due && (
           <>
             {' '}
-            <s>{fmt(regularAmount)}</s>
+            <s>{fmt(was)}</s>
           </>
         )}{' '}
         for {purpose} to:

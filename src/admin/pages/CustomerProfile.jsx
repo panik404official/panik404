@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useAdmin } from '../ctx';
+import { useAdmin, useMe } from '../ctx';
+import { Created, NewLink } from './ConsentForms';
 import { OrderCard, Timeline, VisitorRow } from '../parts';
 import { EVENT_LABELS, Empty, Field, Loader, Props, ago, day, device, download, money, short, toCsv, when } from '../ui';
 
@@ -17,6 +18,8 @@ export default function CustomerProfile() {
   const { data, error, loading, reload } = useAdmin(`/customers/${id}`);
   const c = data?.customer;
   const s = data?.stats;
+  const { can } = useMe();
+  const [consent, setConsent] = useState(null); // null | 'new' | the created form
 
   return (
     <Loader error={error} loading={loading} onRetry={reload}>
@@ -35,10 +38,24 @@ export default function CustomerProfile() {
               <p className="adm-sub">Customer since {day(c.created_at)}, last active {ago(s.last_seen_at)}</p>
             </div>
             <div className="adm-head-actions">
+              {can('consent_manage') && (
+                <button className="adm-btn primary" onClick={() => setConsent('new')} disabled={consent === 'new'}>
+                  Create consent form
+                </button>
+              )}
               <button className="adm-btn" onClick={reload} disabled={loading}>Refresh</button>
               <button className="adm-btn" onClick={() => download(`customer-${c.email}.json`, JSON.stringify(data, null, 2))}>Download all data</button>
             </div>
           </header>
+
+          {consent === 'new' && (
+            <NewLink
+              initial={{ name: c.name || '', email: c.email || '', phone: c.phone || '' }}
+              onCreated={setConsent}
+              onCancel={() => setConsent(null)}
+            />
+          )}
+          {consent && consent !== 'new' && <Created form={consent} onClose={() => setConsent(null)} />}
 
           <dl className="adm-kpis small">
             <div><dt>Lifetime value</dt><dd>{money(s.lifetime_value)}</dd></div>

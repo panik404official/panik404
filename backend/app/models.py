@@ -332,3 +332,26 @@ class Meeting(Model):
 
     class Meta:
         table = "meetings"
+
+
+class Coupon(Model):
+    """A discount code made by an admin. Customers type it at checkout; the server checks it and takes the
+    discount off the order. `uses` counts orders placed with it (an order that's cancelled gives its use back)."""
+
+    id = fields.UUIDField(primary_key=True)
+    code = fields.CharField(max_length=40, unique=True)  # stored in capitals, no spaces
+    discount_type = fields.CharField(max_length=8)  # percent | amount
+    value = fields.DecimalField(max_digits=12, decimal_places=2)  # 1-100 for percent, rupees for amount
+    applies_to = fields.JSONField(default=list)  # order kinds: booking, gift, product
+    active = fields.BooleanField(default=True)
+    starts_at = fields.DatetimeField(null=True)
+    expires_at = fields.DatetimeField(null=True)
+    max_uses = fields.IntField(null=True)
+    uses = fields.IntField(default=0)
+    note = fields.CharField(max_length=200, null=True)
+    created_by = fields.ForeignKeyField("models.User", related_name="coupons", null=True, on_delete=fields.SET_NULL)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "coupons"

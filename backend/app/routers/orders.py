@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 
 from ..context import build_ctx
-from ..repos import orders as repo
-from ..schemas import LeadIn, OrderIn, OrderOut
+from ..repos import coupons as coupons_repo, orders as repo
+from ..schemas import CouponCheck, LeadIn, OrderIn, OrderOut
 from ..security import limit
 
 router = APIRouter(prefix="/v1", tags=["checkout"], dependencies=[Depends(limit("orders"))])
@@ -30,3 +30,13 @@ async def create_order(
 async def create_lead(body: LeadIn, request: Request):
     ctx = build_ctx(request, body.context, fallback_path="/corporate")
     return {"id": await repo.create_lead(body, ctx)}
+
+
+@router.post("/coupons/check")
+async def check_coupon(body: CouponCheck):
+    """Preview for the checkout's Apply button: is the code usable for this kind of order, and how much off.
+    The order is priced again on the server when it's placed. Rate-limited with orders."""
+    try:
+        return coupons_repo.public_view(await coupons_repo.validate(body.code, body.kind))
+    except coupons_repo.CouponError as e:
+        raise HTTPException(e.status_code, e.message) from e

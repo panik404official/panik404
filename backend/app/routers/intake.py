@@ -7,6 +7,7 @@ import logging
 import re
 import smtplib
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
@@ -94,13 +95,22 @@ async def _store_receipt(s: Settings, order: Order, receipt: Attachment) -> dict
     return meta
 
 
-async def _mark_submitted(order: Order, receipt: dict, coupon: str | None) -> None:
+def _coupon_text(order: Order, typed: str | None = None) -> str:
+    """The coupon applied to the order's price; or what an older page typed (not applied) for the team to see."""
+    d = order.details or {}
+    if d.get("coupon"):
+        return f"{d['coupon']} ({d.get('coupon_label')}, saved {_rs(Decimal(d.get('coupon_discount') or 0))})"
+    return f"{typed} (typed but not applied: not a valid coupon)" if typed else "(none)"
+
+
+async def _mark_submitted(order: Order, receipt: dict, typed_coupon: str | None) -> None:
     order.details = {
         **order.details,
         "request_submitted_at": datetime.now(timezone.utc).isoformat(),
         "receipt": receipt,
-        "coupon": coupon or None,
     }
+    if typed_coupon and not order.details.get("coupon"):
+        order.details["coupon_typed"] = typed_coupon
     await order.save(update_fields=["details", "updated_at"])
 
 
@@ -152,9 +162,10 @@ async def gift_request(request: Request, data: str = Form(...), receipt: UploadF
             f"{'Recipient email' if how == 'email' else 'Mailing address'}: {to or '(none)'}",
             f"Sessions: {sessions}",
             f"Subtotal: {_rs(order.subtotal)}",
-            f"Discount: {d.get('discount_pct', 0)}% ({_rs(order.discount)})",
+            f"Discount: {_rs(order.discount)} (bundle {d.get('discount_pct', 0)}%"
+            f"{', coupon ' + d['coupon'] if d.get('coupon') else ''})",
             f"Total: {_rs(order.total)}",
-            f"Coupon: {body.coupon or '(none)'}",
+            f"Coupon: {_coupon_text(order, body.coupon)}",
             f"Personal message: {message or '(none)'}", "",
             "Verify the attached receipt, then mark the order as paid.",
         ]),
@@ -190,7 +201,7 @@ async def booking_request(request: Request, data: str = Form(...), receipt: Uplo
         ("Suicidal thoughts", body.suicidal), ("Self-harm", body.harm), ("Medical emergency", body.medical),
         ("Current treatment", body.treatment), ("Preferred date", d.get("preferred_date")),
         ("Preferred time", d.get("preferred_time")), ("Notes", body.notes),
-        *([] if partner_rows else [("Coupon", body.coupon)]), *partner_rows,
+        *([] if partner_rows else [("Coupon", _coupon_text(order, body.coupon))]), *partner_rows,
         ("Subtotal", _rs(order.subtotal)), ("Discount", _rs(order.discount)), ("Total", _rs(order.total)),
     ]
     tag = f"{d['partner_name']} booking" if d.get("partner_name") else "Booking"

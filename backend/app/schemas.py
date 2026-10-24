@@ -77,6 +77,7 @@ class OrderBase(Strict):
     session_id: UUID
     customer: CustomerIn
     context: TrackContext | None = None
+    coupon: str | None = Field(None, max_length=40)  # checked and priced on the server
 
 
 class CartItem(Strict):
@@ -362,3 +363,37 @@ class MeetingEdit(Strict):
 
 class MeetingFeedback(Strict):
     feedback: str = Field(min_length=1, max_length=5000)
+
+
+# ---- coupons ---------------------------------------------------------------------------------------
+CouponKind = Literal["booking", "gift", "product"]
+
+
+class CouponCheck(Strict):
+    code: str = Field(min_length=1, max_length=40)
+    kind: CouponKind
+
+
+class CouponCreate(Strict):
+    code: str = Field(min_length=3, max_length=40)
+    discount_type: Literal["percent", "amount"]
+    value: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
+    applies_to: list[CouponKind] = Field(default_factory=lambda: ["booking", "gift", "product"], max_length=3)
+    active: bool = True
+    starts_at: datetime | None = None
+    expires_at: datetime | None = None
+    max_uses: int | None = Field(None, ge=1, le=1_000_000)
+    note: str | None = Field(None, max_length=200)
+
+
+class CouponUpdate(Strict):
+    """The code itself can't change (orders refer to it); everything else can."""
+
+    discount_type: Literal["percent", "amount"] | None = None
+    value: Decimal | None = Field(None, gt=0, max_digits=12, decimal_places=2)
+    applies_to: list[CouponKind] | None = Field(None, max_length=3)
+    active: bool | None = None
+    starts_at: datetime | None = None
+    expires_at: datetime | None = None
+    max_uses: int | None = Field(None, ge=1, le=1_000_000)
+    note: str | None = Field(None, max_length=200)

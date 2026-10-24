@@ -4,10 +4,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile
 
-from ..repos import admin as admin_repo, analytics, consent as consent_repo, meetings as meetings_repo, orders as orders_repo, partners as partners_repo
-from ..auth import Principal, principal, require, require_panel_access
+from ..repos import admin as admin_repo, analytics, consent as consent_repo, coupons as coupons_repo, meetings as meetings_repo, orders as orders_repo, partners as partners_repo
+from ..auth import Principal, principal, require, require_admin_role, require_panel_access
 from ..notify import notify, users_who_can
-from ..schemas import (ConsentAssign, ConsentCreate, ConsentSign, MeetingEdit, MeetingFeedback, OrderOut,
+from ..schemas import (ConsentAssign, ConsentCreate, ConsentSign, CouponCreate, CouponUpdate, MeetingEdit, MeetingFeedback, OrderOut,
                        PartnerReview, StatusUpdate)
 from .consent import send_signed_copy
 
@@ -443,3 +443,39 @@ async def cancel_meeting(meeting_id: UUID, request: Request, background: Backgro
     m = await _visible_meeting(meeting_id, principal(request))
     m = await meetings_repo.cancel(request.app.state.settings, background, m, why="an admin cancelled it")
     return await _meeting_out(await meetings_repo.get(m.id))
+
+
+
+# ---- coupons (admins only: /v1/admin/coupons isn't in PATH_PERMISSIONS, and each endpoint checks too) -------
+def _coupon_error(e: coupons_repo.CouponError):
+    raise HTTPException(e.status_code, e.message) from e
+
+
+@router.get("/coupons", dependencies=[Depends(require_admin_role)])
+async def list_coupons():
+    return {"items": await coupons_repo.list_coupons()}
+
+
+@router.post("/coupons", status_code=201)
+async def create_coupon(body: CouponCreate, p: Principal = Depends(require_admin_role)):
+    try:
+        return await coupons_repo.create(body, p.user_id)
+    except coupons_repo.CouponError as e:
+        _coupon_error(e)
+
+
+@router.patch("/coupons/{coupon_id}", dependencies=[Depends(require_admin_role)])
+async def update_coupon(coupon_id: UUID, body: CouponUpdate):
+    try:
+        return await coupons_repo.update(coupon_id, body)
+    except coupons_repo.CouponError as e:
+        _coupon_error(e)
+
+
+@router.delete("/coupons/{coupon_id}", status_code=204, dependencies=[Depends(require_admin_role)])
+async def delete_coupon(coupon_id: UUID):
+    """Only for codes never used; a used code is switched off instead so old orders still make sense."""
+    try:
+        await coupons_repo.delete(coupon_id)
+    except coupons_repo.CouponError as e:
+        _coupon_error(e)
