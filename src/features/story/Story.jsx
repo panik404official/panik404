@@ -334,8 +334,11 @@ export default function Story() {
       const dt = Math.min(ck.getDelta(), 0.05),
         t = ck.elapsedTime,
         r = wrap.getBoundingClientRect();
-      const raw = (headerHeight - r.top) / Math.max(1, r.height - stg.clientHeight);
-      hd.classList.toggle('over-story', raw < 1);
+      // the last 100vh of .story is a hold: progress stays at 1 so the end panel lingers before the stage scrolls away
+      const span = r.height - stg.clientHeight,
+        hold = Math.min(innerHeight, span * 0.5),
+        raw = (headerHeight - r.top) / Math.max(1, span - hold);
+      hd.classList.toggle('over-story', headerHeight - r.top < span);
       ps += (Math.min(1, Math.max(0, raw)) - ps) * 0.1;
       const p = ps,
         day = p >= 0.575;
